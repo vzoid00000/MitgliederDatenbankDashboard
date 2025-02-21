@@ -1,0 +1,22 @@
+# Node modules and dependencies
+node_modules/
+.vite/
+
+# Editor/IDE configurations
+.idea/
+
+# Build outputs and caches
+dist/
+.next/
+out/
+
+# Database files
+mitglieder.mwb
+mitglieder.sql
+
+# Environment variables
+.env
+.env.local
+.env.development
+.env.production
+.env.test
