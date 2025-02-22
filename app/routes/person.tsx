@@ -2,6 +2,8 @@ import { json, LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
 import { useLoaderData, Form, Link } from "@remix-run/react";
 import { prisma } from "~/db.server";
 import { useState } from "react";
+import {useActionData} from "react-router";
+import { Prisma } from "@prisma/client";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     const persons = await prisma.person.findMany({
@@ -28,135 +30,178 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-    const formData = await request.formData();
-    const action = formData.get("_action");
+    try {
+        const formData = await request.formData();
+        const action = formData.get("_action");
 
-    const personData = {
-        vorname: formData.get("vorname") as string,
-        nachname: formData.get("nachname") as string,
-        geburtsdatum: formData.get("geburtsdatum")
-            ? new Date(formData.get("geburtsdatum") as string)
-            : null,
-        geschlecht_id: parseInt(formData.get("geschlecht_id") as string),
-        rolle_id: parseInt(formData.get("rolle_id") as string),
-        notiz: formData.get("notiz") as string,
-        // Hier der angepasste Name:
-        ist_landesverband_gemeldet: parseInt(
-            formData.get("ist_landesverband_gemeldet") as string
-        ),
-        hat_schluessel_suessenbrunn: parseInt(
-            formData.get("hat_schluessel_suessenbrunn") as string
-        ),
-        mitgliedsnummer: formData.get("mitgliedsnummer")
-            ? parseInt(formData.get("mitgliedsnummer") as string)
-            : null,
-        schuetzenpassnummer: formData.get("schuetzenpassnummer")
-            ? parseInt(formData.get("schuetzenpassnummer") as string)
-            : null,
-        strasse: formData.get("strasse") as string,
-        ort: formData.get("ort") as string,
-        plz: formData.get("plz") as string,
-    };
+        // Serverseitige Validierung der Mitgliedsnummer
+        const mitgliedsnummerStr = formData.get("mitgliedsnummer");
+        let mitgliedsnummer: number | null = null;
+        if (mitgliedsnummerStr) {
+            const parsed = parseInt(mitgliedsnummerStr as string, 10);
+            if (!Number.isInteger(parsed) || parsed <= 0) {
+                return json(
+                    { error: "Mitgliedsnummer muss eine positive Ganzzahl größer als 0 sein." },
+                    { status: 400 }
+                );
+            }
+            mitgliedsnummer = parsed;
+        }
 
-    const emails = formData.getAll("emails[]").filter(Boolean) as string[];
-    const telefonnummern = formData
-        .getAll("telefonnummern[]")
-        .filter(Boolean) as string[];
-    const telefonnummerTypen = formData
-        .getAll("telefonnummer_typen[]")
-        .filter(Boolean) as string[];
-    const status_id = parseInt(formData.get("status_id") as string);
+        // Serverseitige Validierung der Schützenpassnummer
+        const schuetzenpassnummerStr = formData.get("schuetzenpassnummer");
+        let schuetzenpassnummer: number | null = null;
+        if (schuetzenpassnummerStr) {
+            const parsed = parseInt(schuetzenpassnummerStr as string, 10);
+            if (!Number.isInteger(parsed) || parsed <= 0) {
+                return json(
+                    { error: "Schützenpassnummer muss eine positive Ganzzahl größer als 0 sein." },
+                    { status: 400 }
+                );
+            }
+            schuetzenpassnummer = parsed;
+        }
 
-    if (action === "create") {
-        const newPerson = await prisma.person.create({
-            data: {
-                ...personData,
-                email_hat_person: {
-                    create: emails.map((email) => ({
-                        email: {
-                            connectOrCreate: {
-                                where: { email_adresse: email },
-                                create: { email_adresse: email },
+        const personData = {
+            vorname: formData.get("vorname") as string,
+            nachname: formData.get("nachname") as string,
+            geburtsdatum: formData.get("geburtsdatum")
+                ? new Date(formData.get("geburtsdatum") as string)
+                : null,
+            geschlecht_id: parseInt(formData.get("geschlecht_id") as string),
+            rolle_id: parseInt(formData.get("rolle_id") as string),
+            notiz: formData.get("notiz") as string,
+            // Hier der angepasste Name:
+            ist_landesverband_gemeldet: parseInt(
+                formData.get("ist_landesverband_gemeldet") as string
+            ),
+            hat_schluessel_suessenbrunn: parseInt(
+                formData.get("hat_schluessel_suessenbrunn") as string
+            ),
+            mitgliedsnummer,
+            schuetzenpassnummer,
+            strasse: formData.get("strasse") as string,
+            ort: formData.get("ort") as string,
+            plz: formData.get("plz") as string,
+        };
+
+        const emails = formData.getAll("emails[]").filter(Boolean) as string[];
+        const telefonnummern = formData.getAll("telefonnummern[]").filter(Boolean) as string[];
+        const telefonnummerTypen = formData.getAll("telefonnummer_typen[]").filter(Boolean) as string[];
+        const status_id = parseInt(formData.get("status_id") as string);
+
+        if (action === "create") {
+            const newPerson = await prisma.person.create({
+                data: {
+                    ...personData,
+                    email_hat_person: {
+                        create: emails.map((email) => ({
+                            email: {
+                                connectOrCreate: {
+                                    where: { email_adresse: email },
+                                    create: { email_adresse: email },
+                                },
                             },
-                        },
-                    })),
-                },
-                person_hat_telefonnummer: {
-                    create: telefonnummern.map((telefonnummer, index) => ({
-                        telefonnummer: {
-                            create: {
-                                telefonnummer: telefonnummer,
-                                telefonnummer_typ_id: parseInt(telefonnummerTypen[index]),
+                        })),
+                    },
+                    person_hat_telefonnummer: {
+                        create: telefonnummern.map((telefonnummer, index) => ({
+                            telefonnummer: {
+                                create: {
+                                    telefonnummer: telefonnummer,
+                                    telefonnummer_typ_id: parseInt(telefonnummerTypen[index]),
+                                },
                             },
-                        },
-                    })),
+                        })),
+                    },
                 },
-            },
-        });
-        // Erstelle einen neuen Statuszeitraum-Eintrag
-        await prisma.statuszeitraum.create({
-            data: {
-                person_id: newPerson.person_id,
-                status_id: status_id,
-                von: new Date(),
-                bis: null,
-            },
-        });
-    } else if (action === "update") {
-        const personId = formData.get("person_id");
-        await prisma.person.update({
-            where: { person_id: parseInt(personId as string) },
-            data: {
-                ...personData,
-                email_hat_person: {
-                    deleteMany: {},
-                    create: emails.map((email) => ({
-                        email: {
-                            connectOrCreate: {
-                                where: { email_adresse: email },
-                                create: { email_adresse: email },
+            });
+            // Erstelle einen neuen Statuszeitraum-Eintrag
+            await prisma.statuszeitraum.create({
+                data: {
+                    person_id: newPerson.person_id,
+                    status_id: status_id,
+                    von: new Date(),
+                    bis: null,
+                },
+            });
+            return json({ success: "Person erfolgreich erstellt." });
+        } else if (action === "update") {
+            const personId = formData.get("person_id");
+            await prisma.person.update({
+                where: { person_id: parseInt(personId as string) },
+                data: {
+                    ...personData,
+                    email_hat_person: {
+                        deleteMany: {},
+                        create: emails.map((email) => ({
+                            email: {
+                                connectOrCreate: {
+                                    where: { email_adresse: email },
+                                    create: { email_adresse: email },
+                                },
                             },
-                        },
-                    })),
-                },
-                person_hat_telefonnummer: {
-                    deleteMany: {},
-                    create: telefonnummern.map((telefonnummer, index) => ({
-                        telefonnummer: {
-                            create: {
-                                telefonnummer: telefonnummer,
-                                telefonnummer_typ_id: parseInt(telefonnummerTypen[index]),
+                        })),
+                    },
+                    person_hat_telefonnummer: {
+                        deleteMany: {},
+                        create: telefonnummern.map((telefonnummer, index) => ({
+                            telefonnummer: {
+                                create: {
+                                    telefonnummer: telefonnummer,
+                                    telefonnummer_typ_id: parseInt(telefonnummerTypen[index]),
+                                },
                             },
-                        },
-                    })),
+                        })),
+                    },
                 },
-            },
-        });
-        // Aktualisiere den Status: Lösche vorhandene Einträge und erstelle einen neuen
-        await prisma.statuszeitraum.deleteMany({
-            where: { person_id: parseInt(personId as string) },
-        });
-        await prisma.statuszeitraum.create({
-            data: {
-                person_id: parseInt(personId as string),
-                status_id: status_id,
-                von: new Date(),
-                bis: null,
-            },
-        });
-    } else if (action === "delete") {
-        const deleteId = formData.get("person_id");
-        await prisma.person.delete({
-            where: { person_id: parseInt(deleteId as string) },
-        });
+            });
+            // Aktualisiere den Status: Lösche vorhandene Einträge und erstelle einen neuen
+            await prisma.statuszeitraum.deleteMany({
+                where: { person_id: parseInt(personId as string) },
+            });
+            await prisma.statuszeitraum.create({
+                data: {
+                    person_id: parseInt(personId as string),
+                    status_id: status_id,
+                    von: new Date(),
+                    bis: null,
+                },
+            });
+            return json({ success: "Person erfolgreich aktualisiert." });
+        } else if (action === "delete") {
+            const deleteId = formData.get("person_id");
+            await prisma.person.delete({
+                where: { person_id: parseInt(deleteId as string) },
+            });
+            return json({ success: "Person erfolgreich gelöscht." });
+        }
+
+        return null;
+    } catch (error) {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+            // Ermittele, welche Felder das Unique Constraint verletzt haben
+            const target = (error.meta && error.meta.target) || [];
+            let message = "Ein oder mehrere Felder sind bereits vergeben.";
+            if (target.includes("mitgliedsnummer")) {
+                message = "Die Mitgliedsnummer existiert bereits. Bitte wähle eine andere.";
+            } else if (target.includes("schuetzenpassnummer")) {
+                message = "Die Schützenpassnummer existiert bereits. Bitte wähle eine andere.";
+            }
+            return json({ error: message }, { status: 400 });
+        }
+        if (error instanceof Error) {
+            return json({ error: error.message }, { status: 400 });
+        }
+        return json({ error: "Unbekannter Fehler" }, { status: 400 });
     }
-
-    return null;
 };
 
+
+
 export default function PersonList() {
-    const { persons, geschlechter, telefonnummerTypen, roles, statuses } =
-        useLoaderData<typeof loader>();
+    const { persons, geschlechter, telefonnummerTypen, roles, statuses } = useLoaderData<typeof loader>();
+    const actionData = useActionData<{ error?: string; success?: string }>();
     const [editingPerson, setEditingPerson] = useState<number | null>(null);
     const [emails, setEmails] = useState<string[]>([""]);
     const [telefonnummern, setTelefonnummern] = useState<
@@ -189,6 +234,19 @@ export default function PersonList() {
     return (
         <div className="container mx-auto p-4">
             <h1 className="text-2xl font-bold mb-4">Personenliste</h1>
+
+            {/* Anzeige von Fehler- und Erfolgsmeldungen */}
+            {actionData?.error && (
+                <div className="mb-4 p-2 text-red-700 bg-red-100">
+                    {actionData.error}
+                </div>
+            )}
+            {actionData?.success && (
+                <div className="mb-4 p-2 text-green-700 bg-green-100">
+                    {actionData.success}
+                </div>
+            )}
+
             <Link
                 to="/"
                 className="text-blue-500 hover:underline mb-4 inline-block"
@@ -267,6 +325,8 @@ export default function PersonList() {
                             id="mitgliedsnummer"
                             name="mitgliedsnummer"
                             className="w-full p-2 border rounded"
+                            min="1"
+                            step="1"
                         />
                     </div>
                     <div>
@@ -278,6 +338,8 @@ export default function PersonList() {
                             id="schuetzenpassnummer"
                             name="schuetzenpassnummer"
                             className="w-full p-2 border rounded"
+                            min="1"
+                            step="1"
                         />
                     </div>
                     <div>
@@ -292,17 +354,6 @@ export default function PersonList() {
                         />
                     </div>
                     <div>
-                        <label htmlFor="ort" className="block">
-                            Ort
-                        </label>
-                        <input
-                            type="text"
-                            id="ort"
-                            name="ort"
-                            className="w-full p-2 border rounded"
-                        />
-                    </div>
-                    <div>
                         <label htmlFor="plz" className="block">
                             PLZ
                         </label>
@@ -310,6 +361,17 @@ export default function PersonList() {
                             type="text"
                             id="plz"
                             name="plz"
+                            className="w-full p-2 border rounded"
+                        />
+                    </div>
+                    <div>
+                        <label htmlFor="ort" className="block">
+                            Ort
+                        </label>
+                        <input
+                            type="text"
+                            id="ort"
+                            name="ort"
                             className="w-full p-2 border rounded"
                         />
                     </div>
