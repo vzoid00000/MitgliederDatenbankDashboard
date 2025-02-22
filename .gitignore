@@ -10,9 +10,8 @@ dist/
 .next/
 out/
 
-# Database files
-mitglieder.mwb
-mitglieder.sql
+# temp files
+*.bak
 
 # Environment variables
 .env
