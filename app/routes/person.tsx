@@ -11,12 +11,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         include: {
             geschlecht: true,
             rolle: true,
-            statuszeitraum: {
-                orderBy: { von: 'desc' },
-                take: 1, // aktueller Status (falls vorhanden)
-                include: { status: true },
-            },
-            email_hat_person: { include: { email: true } },
+            status: true,
+            person_hat_email: { include: { email: true } },
             person_hat_telefonnummer: {
                 include: { telefonnummer: { include: { telefonnummer_typ: true } } },
             },
@@ -28,6 +24,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const statuses = await prisma.status.findMany();
     return json({ persons, geschlechter, telefonnummerTypen, roles, statuses });
 };
+
 
 export const action = async ({ request }: ActionFunctionArgs) => {
     try {
@@ -70,6 +67,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 : null,
             geschlecht_id: parseInt(formData.get("geschlecht_id") as string),
             rolle_id: parseInt(formData.get("rolle_id") as string),
+            status_id: parseInt(formData.get("status_id") as string),
             notiz: formData.get("notiz") as string,
             // Hier der angepasste Name:
             ist_landesverband_gemeldet: parseInt(
@@ -94,7 +92,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             const newPerson = await prisma.person.create({
                 data: {
                     ...personData,
-                    email_hat_person: {
+                    person_hat_email: {
                         create: emails.map((email) => ({
                             email: {
                                 connectOrCreate: {
@@ -116,15 +114,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     },
                 },
             });
-            // Erstelle einen neuen Statuszeitraum-Eintrag
-            await prisma.statuszeitraum.create({
-                data: {
-                    person_id: newPerson.person_id,
-                    status_id: status_id,
-                    von: new Date(),
-                    bis: null,
-                },
-            });
             return json({ success: "Person erfolgreich erstellt." });
         } else if (action === "update") {
             const personId = formData.get("person_id");
@@ -132,7 +121,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 where: { person_id: parseInt(personId as string) },
                 data: {
                     ...personData,
-                    email_hat_person: {
+                    person_hat_email: {
                         deleteMany: {},
                         create: emails.map((email) => ({
                             email: {
@@ -377,7 +366,7 @@ export default function PersonList() {
                     </div>
                     <div>
                         <label htmlFor="ist_landesverband_gemeldet" className="block">
-                            Beim Landesverband gemeldet?
+                            Beim Landesverband gemeldet?*
                         </label>
                         <select
                             id="ist_landesverband_gemeldet"
@@ -391,7 +380,7 @@ export default function PersonList() {
                     </div>
                     <div>
                         <label htmlFor="hat_schluessel_suessenbrunn" className="block">
-                            Hat Schlüssel Süßenbrunn
+                            Hat Schlüssel Süßenbrunn?*
                         </label>
                         <select
                             id="hat_schluessel_suessenbrunn"
@@ -404,19 +393,10 @@ export default function PersonList() {
                         </select>
                     </div>
                     <div>
-                        <label htmlFor="status_id" className="block">
-                            Status*
-                        </label>
-                        <select
-                            id="status_id"
-                            name="status_id"
-                            required
-                            className="w-full p-2 border rounded"
-                        >
+                        <label htmlFor="status_id" className="block">Status*</label>
+                        <select id="status_id" name="status_id" required className="w-full p-2 border rounded">
                             {statuses.map((s) => (
-                                <option key={s.status_id} value={s.status_id}>
-                                    {s.status_bezeichnung}
-                                </option>
+                                <option key={s.status_id} value={s.status_id}>{s.status_bezeichnung}</option>
                             ))}
                         </select>
                     </div>
@@ -560,9 +540,9 @@ export default function PersonList() {
                                 >
                                     Bearbeiten
                                 </button>
-                                <Form method="post" style={{ display: "inline" }}>
-                                    <input type="hidden" name="_action" value="delete" />
-                                    <input type="hidden" name="person_id" value={person.person_id} />
+                                <Form method="post" style={{display: "inline"}}>
+                                    <input type="hidden" name="_action" value="delete"/>
+                                    <input type="hidden" name="person_id" value={person.person_id}/>
                                     <button
                                         type="submit"
                                         className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600"
@@ -603,8 +583,8 @@ export default function PersonList() {
                         <div>
                             <strong>Status:</strong>
                             <ul>
-                                {person.statuszeitraum.length > 0 ? (
-                                    <li>{person.statuszeitraum[0].status.status_bezeichnung}</li>
+                                {person.status ? (
+                                    <li>{person.status.status_bezeichnung}</li>
                                 ) : (
                                     <li>N/A</li>
                                 )}
@@ -613,8 +593,8 @@ export default function PersonList() {
                         <div>
                             <strong>E-Mail Adressen:</strong>
                             <ul>
-                                {person.email_hat_person.map((ehp) => (
-                                    <li key={ehp.email.email_id}>{ehp.email.email_adresse}</li>
+                                {person.person_hat_email.map((phe) => (
+                                    <li key={phe.email.email_id}>{phe.email.email_adresse}</li>
                                 ))}
                             </ul>
                         </div>

@@ -35,23 +35,13 @@ model cwpmitglieder {
 
 model email {
   email_id         Int                @id @default(autoincrement()) @db.UnsignedInt
-  email_adresse    String?            @unique(map: "idx_email_adresse") @db.VarChar(45)
-  email_hat_person email_hat_person[]
-}
-
-model email_hat_person {
-  email_id  Int    @db.UnsignedInt
-  person_id Int    @db.UnsignedInt
-  email     email  @relation(fields: [email_id], references: [email_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_email_has_person_email")
-  person    person @relation(fields: [person_id], references: [person_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_email_has_person_person")
-
-  @@id([email_id, person_id])
-  @@index([person_id], map: "fk_email_hat_person_person")
+  email_adresse    String?            @unique(map: "unique_email_adresse") @db.VarChar(45)
+  person_hat_email person_hat_email[]
 }
 
 model geschlecht {
   geschlecht_id Int      @id @default(autoincrement()) @db.UnsignedInt
-  geschlecht    String   @unique(map: "idx_geschlecht") @db.VarChar(1)
+  geschlecht    String   @unique(map: "unique_geschlecht") @db.VarChar(1)
   person        person[]
 }
 
@@ -62,7 +52,7 @@ model mitgliedschaftszeitraum {
   person_id                  Int       @db.UnsignedInt
   person                     person    @relation(fields: [person_id], references: [person_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_mitgliedschaftszeitraum_person")
 
-  @@index([person_id], map: "fk_mitgliedschaftszeitraum_person")
+  @@index([person_id], map: "idx_person")
 }
 
 model person {
@@ -70,8 +60,8 @@ model person {
   vorname                     String                     @db.VarChar(45)
   nachname                    String                     @db.VarChar(45)
   geburtsdatum                DateTime?                  @db.Date
-  mitgliedsnummer             Int?                       @unique(map: "mitgliedsnummer") @db.UnsignedInt
-  schuetzenpassnummer         Int?                       @unique(map: "schuetzenpassnummer") @db.UnsignedInt
+  mitgliedsnummer             Int?                       @unique(map: "unique_mitgliedsnummer") @db.UnsignedInt
+  schuetzenpassnummer         Int?                       @unique(map: "unique_schuetzenpassnummer") @db.UnsignedInt
   strasse                     String?                    @db.VarChar(45)
   ort                         String?                    @db.VarChar(45)
   plz                         String?                    @db.VarChar(45)
@@ -79,17 +69,19 @@ model person {
   ist_landesverband_gemeldet  Int                        @db.UnsignedTinyInt
   hat_schluessel_suessenbrunn Int                        @db.UnsignedTinyInt
   rolle_id                    Int                        @db.UnsignedInt
+  status_id                   Int                        @db.UnsignedInt
   notiz                       String?                    @db.Text
-  email_hat_person            email_hat_person[]
   mitgliedschaftszeitraum     mitgliedschaftszeitraum[]
   geschlecht                  geschlecht                 @relation(fields: [geschlecht_id], references: [geschlecht_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_person_geschlecht")
   rolle                       rolle                      @relation(fields: [rolle_id], references: [rolle_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_person_rolle")
+  status                      status                     @relation(fields: [status_id], references: [status_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_person_status")
+  person_hat_email            person_hat_email[]
   person_hat_telefonnummer    person_hat_telefonnummer[]
   person_hat_titel            person_hat_titel[]
-  statuszeitraum              statuszeitraum[]
 
-  @@index([geschlecht_id], map: "fk_person_geschlecht")
-  @@index([rolle_id], map: "fk_person_rolle")
+  @@index([geschlecht_id], map: "idx_geschlecht")
+  @@index([rolle_id], map: "idx_rolle")
+  @@index([status_id], map: "idx_status")
 }
 
 model person_hat_telefonnummer {
@@ -99,7 +91,8 @@ model person_hat_telefonnummer {
   telefonnummer    telefonnummer @relation(fields: [telefonnummer_id], references: [telefonnummer_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_person_hat_telefonnummer_telefonnummer")
 
   @@id([person_id, telefonnummer_id])
-  @@index([telefonnummer_id], map: "fk_person_hat_telefonnummer_telefonnummer")
+  @@index([person_id], map: "idx_person_telefonnummer")
+  @@index([telefonnummer_id], map: "idx_telefonnummer")
 }
 
 model person_hat_titel {
@@ -109,26 +102,14 @@ model person_hat_titel {
   titel     titel  @relation(fields: [titel_id], references: [titel_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_person_hat_titel_titel")
 
   @@id([person_id, titel_id])
-  @@index([titel_id], map: "fk_person_hat_titel_titel")
+  @@index([person_id], map: "idx_person_titel")
+  @@index([titel_id], map: "idx_titel")
 }
 
 model status {
-  status_id          Int              @id @default(autoincrement()) @db.UnsignedInt
-  status_bezeichnung String           @unique(map: "idx_status_bezeichnung") @db.VarChar(45)
-  statuszeitraum     statuszeitraum[]
-}
-
-model statuszeitraum {
-  statuszeitraum_id Int       @id @default(autoincrement()) @db.UnsignedInt
-  von               DateTime? @db.Date
-  bis               DateTime? @db.Date
-  status_id         Int       @db.UnsignedInt
-  person_id         Int       @db.UnsignedInt
-  person            person    @relation(fields: [person_id], references: [person_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_statuszeitraum_person")
-  status            status    @relation(fields: [status_id], references: [status_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_statuszeitraum_status")
-
-  @@index([person_id], map: "fk_statuszeitraum_person")
-  @@index([status_id], map: "fk_statuszeitraum_status")
+  status_id          Int      @id @default(autoincrement()) @db.UnsignedInt
+  status_bezeichnung String   @unique(map: "unique_status_bezeichnung") @db.VarChar(45)
+  person             person[]
 }
 
 model telefonnummer {
@@ -138,23 +119,34 @@ model telefonnummer {
   person_hat_telefonnummer person_hat_telefonnummer[]
   telefonnummer_typ        telefonnummer_typ          @relation(fields: [telefonnummer_typ_id], references: [telefonnummer_typ_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_telefonnummer_typ")
 
-  @@index([telefonnummer_typ_id], map: "fk_telefonnummer_typ")
+  @@index([telefonnummer_typ_id], map: "idx_telefonnummer_typ")
 }
 
 model telefonnummer_typ {
   telefonnummer_typ_id Int             @id @default(autoincrement()) @db.UnsignedInt
-  telefonnummer_typ    String          @unique(map: "idx_telefonnummer_typ") @db.VarChar(45)
+  telefonnummer_typ    String          @unique(map: "unique_telefonnummer_typ") @db.VarChar(45)
   telefonnummer        telefonnummer[]
 }
 
 model titel {
   titel_id         Int                @id @default(autoincrement()) @db.UnsignedInt
-  titel            String             @unique(map: "idx_titel") @db.VarChar(45)
+  titel            String             @unique(map: "unique_titel") @db.VarChar(45)
   person_hat_titel person_hat_titel[]
 }
 
 model rolle {
   rolle_id          Int      @id @default(autoincrement()) @db.UnsignedInt
-  rolle_bezeichnung String   @unique(map: "idx_rolle_bezeichnung") @db.VarChar(45)
+  rolle_bezeichnung String   @unique(map: "unique_rolle_bezeichnung") @db.VarChar(45)
   person            person[]
+}
+
+model person_hat_email {
+  person_id Int    @db.UnsignedInt
+  email_id  Int    @db.UnsignedInt
+  email     email  @relation(fields: [email_id], references: [email_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_email_person")
+  person    person @relation(fields: [person_id], references: [person_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_person_email")
+
+  @@id([person_id, email_id])
+  @@index([email_id], map: "idx_email")
+  @@index([person_id], map: "idx_person_email")
 }
