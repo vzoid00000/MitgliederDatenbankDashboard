@@ -1,20 +1,23 @@
-import { json, LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
-import { useLoaderData, Form, Link } from "@remix-run/react";
-import { prisma } from "~/db.server";
-import { useState } from "react";
+import {json, LoaderFunctionArgs, ActionFunctionArgs} from "@remix-run/node";
+import {useLoaderData, Form, Link} from "@remix-run/react";
+import {prisma} from "~/db.server";
+import {useState} from "react";
 import {useActionData} from "react-router";
-import { Prisma } from "@prisma/client";
+import {Prisma} from "@prisma/client";
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
+export const loader = async ({request}: LoaderFunctionArgs) => {
     const persons = await prisma.person.findMany({
         take: 10,
         include: {
             geschlecht: true,
             rolle: true,
             status: true,
-            person_hat_email: { include: { email: true } },
+            person_hat_email: {include: {email: true}},
             person_hat_telefonnummer: {
-                include: { telefonnummer: { include: { telefonnummer_typ: true } } },
+                include: {telefonnummer: {include: {telefonnummer_typ: true}}},
+            },
+            mitgliedschaftszeitraum: {
+                orderBy: {von: 'desc'},
             },
         },
     });
@@ -22,11 +25,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const telefonnummerTypen = await prisma.telefonnummer_typ.findMany();
     const roles = await prisma.rolle.findMany();
     const statuses = await prisma.status.findMany();
-    return json({ persons, geschlechter, telefonnummerTypen, roles, statuses });
+    return json({persons, geschlechter, telefonnummerTypen, roles, statuses});
 };
 
 
-export const action = async ({ request }: ActionFunctionArgs) => {
+export const action = async ({request}: ActionFunctionArgs) => {
     try {
         const formData = await request.formData();
         const action = formData.get("_action");
@@ -38,8 +41,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             const parsed = parseInt(mitgliedsnummerStr as string, 10);
             if (!Number.isInteger(parsed) || parsed <= 0) {
                 return json(
-                    { error: "Mitgliedsnummer muss eine positive Ganzzahl größer als 0 sein." },
-                    { status: 400 }
+                    {error: "Mitgliedsnummer muss eine positive Ganzzahl größer als 0 sein."},
+                    {status: 400}
                 );
             }
             mitgliedsnummer = parsed;
@@ -52,8 +55,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             const parsed = parseInt(schuetzenpassnummerStr as string, 10);
             if (!Number.isInteger(parsed) || parsed <= 0) {
                 return json(
-                    { error: "Schützenpassnummer muss eine positive Ganzzahl größer als 0 sein." },
-                    { status: 400 }
+                    {error: "Schützenpassnummer muss eine positive Ganzzahl größer als 0 sein."},
+                    {status: 400}
                 );
             }
             schuetzenpassnummer = parsed;
@@ -96,8 +99,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                         create: emails.map((email) => ({
                             email: {
                                 connectOrCreate: {
-                                    where: { email_adresse: email },
-                                    create: { email_adresse: email },
+                                    where: {email_adresse: email},
+                                    create: {email_adresse: email},
                                 },
                             },
                         })),
@@ -114,56 +117,30 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     },
                 },
             });
-            return json({ success: "Person erfolgreich erstellt." });
+
+            const beitrittsdatumStr = formData.get("beitrittsdatum") as string | null;
+            let beitrittsdatum: Date | null = null;
+            if (beitrittsdatumStr && beitrittsdatumStr.trim() !== "") {
+                beitrittsdatum = new Date(beitrittsdatumStr);
+            }
+
+            if (beitrittsdatum) {
+                await prisma.mitgliedschaftszeitraum.create({
+                    data: {
+                        von: beitrittsdatum,
+                        bis: null, // Falls noch kein Austrittsdatum vorhanden ist
+                        person_id: newPerson.person_id,
+                    },
+                });
+            }
+
+            return json({success: "Person erfolgreich erstellt."});
         } else if (action === "update") {
-            const personId = formData.get("person_id");
-            await prisma.person.update({
-                where: { person_id: parseInt(personId as string) },
-                data: {
-                    ...personData,
-                    person_hat_email: {
-                        deleteMany: {},
-                        create: emails.map((email) => ({
-                            email: {
-                                connectOrCreate: {
-                                    where: { email_adresse: email },
-                                    create: { email_adresse: email },
-                                },
-                            },
-                        })),
-                    },
-                    person_hat_telefonnummer: {
-                        deleteMany: {},
-                        create: telefonnummern.map((telefonnummer, index) => ({
-                            telefonnummer: {
-                                create: {
-                                    telefonnummer: telefonnummer,
-                                    telefonnummer_typ_id: parseInt(telefonnummerTypen[index]),
-                                },
-                            },
-                        })),
-                    },
-                },
-            });
-            // Aktualisiere den Status: Lösche vorhandene Einträge und erstelle einen neuen
-            await prisma.statuszeitraum.deleteMany({
-                where: { person_id: parseInt(personId as string) },
-            });
-            await prisma.statuszeitraum.create({
-                data: {
-                    person_id: parseInt(personId as string),
-                    status_id: status_id,
-                    von: new Date(),
-                    bis: null,
-                },
-            });
-            return json({ success: "Person erfolgreich aktualisiert." });
+
+            return json({success: "Person erfolgreich aktualisiert."});
         } else if (action === "delete") {
-            const deleteId = formData.get("person_id");
-            await prisma.person.delete({
-                where: { person_id: parseInt(deleteId as string) },
-            });
-            return json({ success: "Person erfolgreich gelöscht." });
+
+            return json({success: "Person erfolgreich gelöscht."});
         }
 
         return null;
@@ -177,25 +154,26 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             } else if (target.includes("schuetzenpassnummer")) {
                 message = "Die Schützenpassnummer existiert bereits. Bitte wähle eine andere.";
             }
-            return json({ error: message }, { status: 400 });
+            return json({error: message}, {status: 400});
         }
         if (error instanceof Error) {
-            return json({ error: error.message }, { status: 400 });
+            return json({error: error.message}, {status: 400});
         }
-        return json({ error: "Unbekannter Fehler" }, { status: 400 });
+        return json({error: "Unbekannter Fehler"}, {status: 400});
     }
 };
 
 
-
 export default function PersonList() {
-    const { persons, geschlechter, telefonnummerTypen, roles, statuses } = useLoaderData<typeof loader>();
+    const {persons, geschlechter, telefonnummerTypen, roles, statuses} = useLoaderData<typeof loader>();
     const actionData = useActionData<{ error?: string; success?: string }>();
     const [editingPerson, setEditingPerson] = useState<number | null>(null);
     const [emails, setEmails] = useState<string[]>([""]);
-    const [telefonnummern, setTelefonnummern] = useState<
-        Array<{ nummer: string; typ: string }>
-    >([{ nummer: "", typ: "1" }]);
+    const [telefonnummern, setTelefonnummern] = useState<Array<{ nummer: string; typ: string }>>([{
+        nummer: "",
+        typ: "1"
+    }]);
+    const [expanded, setExpanded] = useState<{ [key: number]: boolean }>({});
 
     const addEmail = () => setEmails([...emails, ""]);
     const removeEmail = (index: number) =>
@@ -207,7 +185,7 @@ export default function PersonList() {
     };
 
     const addTelefonnummer = () =>
-        setTelefonnummern([...telefonnummern, { nummer: "", typ: "1" }]);
+        setTelefonnummern([...telefonnummern, {nummer: "", typ: "1"}]);
     const removeTelefonnummer = (index: number) =>
         setTelefonnummern(telefonnummern.filter((_, i) => i !== index));
     const updateTelefonnummer = (
@@ -250,7 +228,7 @@ export default function PersonList() {
                     value={editingPerson ? "update" : "create"}
                 />
                 {editingPerson && (
-                    <input type="hidden" name="person_id" value={editingPerson} />
+                    <input type="hidden" name="person_id" value={editingPerson}/>
                 )}
                 <div className="grid grid-cols-2 gap-4">
                     <div>
@@ -285,6 +263,15 @@ export default function PersonList() {
                             type="date"
                             id="geburtsdatum"
                             name="geburtsdatum"
+                            className="w-full p-2 border rounded"
+                        />
+                    </div>
+                    <div>
+                        <label htmlFor="beitrittsdatum" className="block">Beitrittsdatum</label>
+                        <input
+                            type="date"
+                            id="beitrittsdatum"
+                            name="beitrittsdatum"
                             className="w-full p-2 border rounded"
                         />
                     </div>
@@ -525,92 +512,87 @@ export default function PersonList() {
                 )}
             </Form>
 
-            {/* Anzeige der Personenliste */}
+            {/* Kompakte, einklappbare Personenliste */}
             <ul className="space-y-4">
-                {persons.map((person) => (
-                    <li key={person.person_id} className="bg-white p-4 rounded shadow">
-                        <div className="flex justify-between items-center mb-2">
-                            <h2 className="text-xl font-bold">
-                                {person.vorname} {person.nachname} ({person.geschlecht.geschlecht})
-                            </h2>
-                            <div>
+                {persons.map((person) => {
+                    const isExpanded = expanded[person.person_id] || false;
+                    // Mitgliedschaftszeitraum ermitteln
+                    const mitgliedschaft =
+                        person.mitgliedschaftszeitraum && person.mitgliedschaftszeitraum.length > 0
+                            ? person.mitgliedschaftszeitraum.find((m) => m.bis === null) || person.mitgliedschaftszeitraum[0]
+                            : null;
+                    return (
+                        <li key={person.person_id} className="bg-white p-4 rounded shadow">
+                            <div className="flex justify-between items-center">
+                                <div>
+                                    <h2 className="text-xl font-bold">
+                                        {person.vorname} {person.nachname}
+                                    </h2>
+                                    <p className="text-sm">
+                                        <strong>Status:</strong> {person.status ? person.status.status_bezeichnung : "N/A"}
+                                    </p>
+                                </div>
                                 <button
-                                    onClick={() => setEditingPerson(person.person_id)}
-                                    className="px-3 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600 mr-2"
+                                    onClick={() =>
+                                        setExpanded((prev) => ({
+                                            ...prev,
+                                            [person.person_id]: !prev[person.person_id],
+                                        }))
+                                    }
+                                    className="text-blue-500 hover:underline"
                                 >
-                                    Bearbeiten
+                                    {isExpanded ? "Details ausblenden" : "Details anzeigen"}
                                 </button>
-                                <Form method="post" style={{display: "inline"}}>
-                                    <input type="hidden" name="_action" value="delete"/>
-                                    <input type="hidden" name="person_id" value={person.person_id}/>
-                                    <button
-                                        type="submit"
-                                        className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600"
-                                        onClick={(e) => {
-                                            if (
-                                                !confirm("Sind Sie sicher, dass Sie diese Person löschen möchten?")
-                                            ) {
-                                                e.preventDefault();
-                                            }
-                                        }}
-                                    >
-                                        Löschen
-                                    </button>
-                                </Form>
                             </div>
-                        </div>
-                        <p>
-                            Geburtsdatum:{" "}
-                            {person.geburtsdatum
-                                ? new Date(person.geburtsdatum).toLocaleDateString()
-                                : "N/A"}
-                        </p>
-                        <p>Mitgliedsnummer: {person.mitgliedsnummer || "N/A"}</p>
-                        <p>Schützenpassnummer: {person.schuetzenpassnummer || "N/A"}</p>
-                        <p>
-                            Adresse: {person.strasse}, {person.plz} {person.ort}
-                        </p>
-                        <p>
-                            Beim Landesverband gemeldet:{" "}
-                            {person.ist_landesverband_gemeldet ? "Ja" : "Nein"}
-                        </p>
-                        <p>
-                            Hat Schlüssel Süßenbrunn:{" "}
-                            {person.hat_schluessel_suessenbrunn ? "Ja" : "Nein"}
-                        </p>
-                        <p>Rolle: {person.rolle.rolle_bezeichnung}</p>
-                        <p>Notiz: {person.notiz || "N/A"}</p>
-                        <div>
-                            <strong>Status:</strong>
-                            <ul>
-                                {person.status ? (
-                                    <li>{person.status.status_bezeichnung}</li>
-                                ) : (
-                                    <li>N/A</li>
-                                )}
-                            </ul>
-                        </div>
-                        <div>
-                            <strong>E-Mail Adressen:</strong>
-                            <ul>
-                                {person.person_hat_email.map((phe) => (
-                                    <li key={phe.email.email_id}>{phe.email.email_adresse}</li>
-                                ))}
-                            </ul>
-                        </div>
-                        <div>
-                            <strong>Telefonnummern:</strong>
-                            <ul>
-                                {person.person_hat_telefonnummer.map((pht) => (
-                                    <li key={pht.telefonnummer.telefonnummer_id}>
-                                        {pht.telefonnummer.telefonnummer} (
-                                        {pht.telefonnummer.telefonnummer_typ.telefonnummer_typ})
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
-                    </li>
-                ))}
+                            {isExpanded && (
+                                <div className="mt-2 text-sm">
+                                    <p>
+                                        <strong>Geburtsdatum:</strong> {person.geburtsdatum ? new Date(person.geburtsdatum).toLocaleDateString() : "N/A"}
+                                    </p>
+                                    <p><strong>Mitgliedsnummer:</strong> {person.mitgliedsnummer || "N/A"}</p>
+                                    <p><strong>Schützenpassnummer:</strong> {person.schuetzenpassnummer || "N/A"}</p>
+                                    <p><strong>Straße:</strong> {person.strasse || "N/A"}</p>
+                                    <p><strong>PLZ:</strong> {person.plz || "N/A"}</p>
+                                    <p><strong>Ort:</strong> {person.ort || "N/A"}</p>
+                                    <p><strong>Beim Landesverband
+                                        gemeldet:</strong> {person.ist_landesverband_gemeldet ? "Ja" : "Nein"}</p>
+                                    <p><strong>Hat Schlüssel
+                                        Süßenbrunn:</strong> {person.hat_schluessel_suessenbrunn ? "Ja" : "Nein"}</p>
+                                    <p><strong>Rolle:</strong> {person.rolle.rolle_bezeichnung}</p>
+                                    <p><strong>Notiz:</strong> {person.notiz || "N/A"}</p>
+                                    {mitgliedschaft && (
+                                        <div>
+                                            <p>
+                                                <strong>Beitrittsdatum:</strong> {mitgliedschaft.von ? new Date(mitgliedschaft.von).toLocaleDateString() : "N/A"}
+                                            </p>
+                                            <p>
+                                                <strong>Austrittsdatum:</strong> {mitgliedschaft.bis ? new Date(mitgliedschaft.bis).toLocaleDateString() : "N/A"}
+                                            </p>
+                                        </div>
+                                    )}
+                                    <div>
+                                        <strong>E-Mail Adressen:</strong>
+                                        <ul>
+                                            {person.person_hat_email.map((phe) => (
+                                                <li key={phe.email.email_id}>{phe.email.email_adresse}</li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                    <div>
+                                        <strong>Telefonnummern:</strong>
+                                        <ul>
+                                            {person.person_hat_telefonnummer.map((pht) => (
+                                                <li key={pht.telefonnummer.telefonnummer_id}>
+                                                    {pht.telefonnummer.telefonnummer} (<strong>{pht.telefonnummer.telefonnummer_typ.telefonnummer_typ}</strong>)
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                </div>
+                            )}
+                        </li>
+                    );
+                })}
             </ul>
         </div>
     );
