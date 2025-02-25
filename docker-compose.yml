@@ -4,10 +4,10 @@ services:
     image: mysql:8.0
     container_name: mysql
     environment:
-      MYSQL_ROOT_PASSWORD: 3ghH4#2Gs.Gel
+      MYSQL_ROOT_PASSWORD: abc1234
       MYSQL_DATABASE: cwp
-      MYSQL_USER: cwp_user
-      MYSQL_PASSWORD: gD43?3@3gmGa56a.h4$a
+      MYSQL_USER: cwpuser
+      MYSQL_PASSWORD: abc123
     ports:
       - '3306:3306'
     volumes:
@@ -24,7 +24,7 @@ services:
       dockerfile: Dockerfile
     container_name: remix_app
     environment:
-      DATABASE_URL: mysql://your_user:gD43?3@3gmGa56a.h4$a@mysql:3306/cwp
+      DATABASE_URL: mysql://cwpuser:abc123@mysql:3306/cwp
     ports:
       - '3000:3000'
     depends_on:
@@ -34,6 +34,5 @@ services:
       - .:/app
       - /app/node_modules
     command: sh -c "npx prisma migrate deploy && npm run start"
-
 volumes:
   mysql_data:
