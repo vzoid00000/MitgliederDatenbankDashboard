@@ -1,3 +1,6 @@
+CREATE DATABASE IF NOT EXISTS cwp;
+USE cwp;
+
 DROP TABLE IF EXISTS person_hat_email;
 DROP TABLE IF EXISTS person_hat_telefonnummer;
 DROP TABLE IF EXISTS person_hat_titel;
