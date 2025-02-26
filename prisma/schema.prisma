@@ -24,7 +24,7 @@ model mitgliedschaftszeitraum {
   von                        DateTime? @db.Date
   bis                        DateTime? @db.Date
   person_id                  Int       @db.UnsignedInt
-  person                     person    @relation(fields: [person_id], references: [person_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_mitgliedschaftszeitraum_person")
+  person                     person    @relation(fields: [person_id], references: [person_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_mitgliedschaftszeitraum_person")
 
   @@index([person_id], map: "idx_person")
 }
@@ -61,7 +61,7 @@ model person {
 model person_hat_telefonnummer {
   person_id        Int           @db.UnsignedInt
   telefonnummer_id Int           @db.UnsignedInt
-  person           person        @relation(fields: [person_id], references: [person_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_person_hat_telefonnummer_person")
+  person           person        @relation(fields: [person_id], references: [person_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_person_hat_telefonnummer_person")
   telefonnummer    telefonnummer @relation(fields: [telefonnummer_id], references: [telefonnummer_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_person_hat_telefonnummer_telefonnummer")
 
   @@id([person_id, telefonnummer_id])
@@ -73,7 +73,7 @@ model person_hat_titel {
   person_id   Int    @db.UnsignedInt
   titel_id    Int    @db.UnsignedInt
   reihenfolge Int    @db.UnsignedInt
-  person      person @relation(fields: [person_id], references: [person_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_person_hat_titel_person")
+  person      person @relation(fields: [person_id], references: [person_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_person_hat_titel_person")
   titel       titel  @relation(fields: [titel_id], references: [titel_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_person_hat_titel_titel")
 
   @@id([person_id, titel_id])
@@ -94,6 +94,7 @@ model telefonnummer {
   person_hat_telefonnummer person_hat_telefonnummer[]
   telefonnummer_typ        telefonnummer_typ          @relation(fields: [telefonnummer_typ_id], references: [telefonnummer_typ_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_telefonnummer_typ")
 
+  @@unique([telefonnummer, telefonnummer_typ_id], map: "unique_telefonnummer_typ")
   @@index([telefonnummer_typ_id], map: "idx_telefonnummer_typ")
 }
 
@@ -123,7 +124,7 @@ model person_hat_email {
   person_id Int    @db.UnsignedInt
   email_id  Int    @db.UnsignedInt
   email     email  @relation(fields: [email_id], references: [email_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_email_person")
-  person    person @relation(fields: [person_id], references: [person_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_person_email")
+  person    person @relation(fields: [person_id], references: [person_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_person_email")
 
   @@id([person_id, email_id])
   @@index([email_id], map: "idx_email")

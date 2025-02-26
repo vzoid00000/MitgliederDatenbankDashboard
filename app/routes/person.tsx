@@ -18,7 +18,7 @@ export const loader = async ({request}: LoaderFunctionArgs) => {
             },
             person_hat_titel: {
                 include: {
-                    titel: { include: { titel_typ: true } }
+                    titel: {include: {titel_typ: true}}
                 }
             },
             mitgliedschaftszeitraum: {
@@ -26,6 +26,7 @@ export const loader = async ({request}: LoaderFunctionArgs) => {
             },
         },
     });
+
     const geschlechter = await prisma.geschlecht.findMany();
     const telefonnummerTypen = await prisma.telefonnummer_typ.findMany();
     const roles = await prisma.rolle.findMany();
@@ -116,9 +117,17 @@ export const action = async ({request}: ActionFunctionArgs) => {
                     person_hat_telefonnummer: {
                         create: telefonnummern.map((telefonnummer, index) => ({
                             telefonnummer: {
-                                create: {
-                                    telefonnummer: telefonnummer,
-                                    telefonnummer_typ_id: parseInt(telefonnummerTypen[index]),
+                                connectOrCreate: {
+                                    where: {
+                                        telefonnummer_telefonnummer_typ_id: {
+                                            telefonnummer: telefonnummer,
+                                            telefonnummer_typ_id: parseInt(telefonnummerTypen[index], 10),
+                                        },
+                                    },
+                                    create: {
+                                        telefonnummer: telefonnummer,
+                                        telefonnummer_typ_id: parseInt(telefonnummerTypen[index], 10),
+                                    },
                                 },
                             },
                         })),
@@ -126,9 +135,9 @@ export const action = async ({request}: ActionFunctionArgs) => {
                     person_hat_titel: {
                         create: titelIds.map((titel_id, index) => ({
                             titel: {
-                                connect: { titel_id: parseInt(titel_id, 10) },
+                                connect: {titel_id: parseInt(titel_id, 10)},
                             },
-                            reihenfolge: parseInt(reihenfolgen[index], 10),
+                            reihenfolge: index + 1,
                         })),
                     },
                 },
@@ -144,7 +153,7 @@ export const action = async ({request}: ActionFunctionArgs) => {
                 await prisma.mitgliedschaftszeitraum.create({
                     data: {
                         von: beitrittsdatum,
-                        bis: null, // Falls noch kein Austrittsdatum vorhanden ist
+                        bis: null,
                         person_id: newPerson.person_id,
                     },
                 });
@@ -155,9 +164,60 @@ export const action = async ({request}: ActionFunctionArgs) => {
 
             return json({success: "Person erfolgreich aktualisiert."});
         } else if (action === "delete") {
+            const personId = parseInt(formData.get("person_id") as string, 10);
 
-            return json({success: "Person erfolgreich gelöscht."});
+            // Zunächst alle zugehörigen E-Mail-IDs und Telefonnummer-IDs abrufen
+            const personEmails = await prisma.person_hat_email.findMany({
+                where: {person_id: personId},
+                select: {email_id: true},
+            });
+
+            const personTelefonnummern = await prisma.person_hat_telefonnummer.findMany({
+                where: {person_id: personId},
+                select: {telefonnummer_id: true},
+            });
+
+            // Lösche die Join-Records für E-Mails und Telefonnummern
+            await prisma.person_hat_email.deleteMany({
+                where: {person_id: personId},
+            });
+            await prisma.person_hat_telefonnummer.deleteMany({
+                where: {person_id: personId},
+            });
+
+            // Lösche die Person selbst
+            await prisma.person.delete({
+                where: {person_id: personId},
+            });
+
+            // Für jede E-Mail prüfen, ob noch andere Personen sie referenzieren.
+            // Falls nicht, lösche auch den E-Mail-Datensatz.
+            for (const {email_id} of personEmails) {
+                const count = await prisma.person_hat_email.count({
+                    where: {email_id},
+                });
+                if (count === 0) {
+                    await prisma.email.delete({
+                        where: {email_id},
+                    });
+                }
+            }
+
+            // Dasselbe für die Telefonnummern:
+            for (const {telefonnummer_id} of personTelefonnummern) {
+                const count = await prisma.person_hat_telefonnummer.count({
+                    where: {telefonnummer_id},
+                });
+                if (count === 0) {
+                    await prisma.telefonnummer.delete({
+                        where: {telefonnummer_id},
+                    });
+                }
+            }
+
+            return json({success: "Person und zugehörige Daten erfolgreich gelöscht."});
         }
+
 
         return null;
     } catch (error) {
@@ -181,7 +241,7 @@ export const action = async ({request}: ActionFunctionArgs) => {
 
 
 export default function PersonList() {
-    const {persons, geschlechter, telefonnummerTypen, roles, statuses, titles } = useLoaderData<typeof loader>();
+    const {persons, geschlechter, telefonnummerTypen, roles, statuses, titles} = useLoaderData<typeof loader>();
     const actionData = useActionData<{ error?: string; success?: string }>();
     const [editingPerson, setEditingPerson] = useState<number | null>(null);
     const [emails, setEmails] = useState<string[]>([""]);
@@ -189,17 +249,19 @@ export default function PersonList() {
         nummer: "",
         typ: "1"
     }]);
-    const [personTitles, setPersonTitles] = useState<Array<{ titel_id: string; reihenfolge: string }>>([
-        { titel_id: titles[0]?.titel_id.toString() || "", reihenfolge: "1" }
+    const [personTitles, setPersonTitles] = useState<Array<{ titel_id: string }>>([
+        {titel_id: ""} // Standard: Kein Titel ausgewählt
     ]);
 
     const addTitle = () =>
-        setPersonTitles([...personTitles, { titel_id: titles[0]?.titel_id.toString() || "", reihenfolge: "1" }]);
+        setPersonTitles([...personTitles, {titel_id: ""}]);
+
     const removeTitle = (index: number) =>
         setPersonTitles(personTitles.filter((_, i) => i !== index));
-    const updateTitle = (index: number, field: "titel_id" | "reihenfolge", value: string) => {
+
+    const updateTitle = (index: number, value: string) => {
         const newTitles = [...personTitles];
-        newTitles[index][field] = value;
+        newTitles[index].titel_id = value;
         setPersonTitles(newTitles);
     };
 
@@ -530,26 +592,20 @@ export default function PersonList() {
                     <label className="block mb-2">Titel</label>
                     {personTitles.map((pt, index) => (
                         <div key={index} className="flex mb-2 items-center">
+                            <span className="mr-2">{index + 1}. Position des Titels:</span>
                             <select
                                 name="titel_id[]"
                                 value={pt.titel_id}
-                                onChange={(e) => updateTitle(index, "titel_id", e.target.value)}
+                                onChange={(e) => updateTitle(index, e.target.value)}
                                 className="flex-grow p-2 border rounded"
                             >
+                                <option value="">Keinen Titel</option>
                                 {titles.map((t) => (
                                     <option key={t.titel_id} value={t.titel_id}>
                                         {t.titel}
                                     </option>
                                 ))}
                             </select>
-                            <input
-                                type="number"
-                                name="reihenfolge[]"
-                                value={pt.reihenfolge}
-                                onChange={(e) => updateTitle(index, "reihenfolge", e.target.value)}
-                                className="ml-2 p-2 border rounded w-20"
-                                min="1"
-                            />
                             {index > 0 && (
                                 <button
                                     type="button"
@@ -588,25 +644,22 @@ export default function PersonList() {
                 )}
             </Form>
 
-            {/* Kompakte, einklappbare Personenliste */}
+            {/* Personenliste */}
             <ul className="space-y-4">
                 {persons.map((person) => {
                     const isExpanded = expanded[person.person_id] || false;
-                    // Mitgliedschaftszeitraum ermitteln
                     const mitgliedschaft =
                         person.mitgliedschaftszeitraum && person.mitgliedschaftszeitraum.length > 0
                             ? person.mitgliedschaftszeitraum.find((m) => m.bis === null) || person.mitgliedschaftszeitraum[0]
                             : null;
 
-                    // Vollständigen Namen inklusive Titel berechnen:
-                    // Titel, die vor dem Namen stehen
                     const beforeTitles = person.person_hat_titel
                         .filter((pt) =>
                             pt.titel.titel_typ.titel_typ_bezeichnung.toLowerCase().includes("vor")
                         )
                         .sort((a, b) => a.reihenfolge - b.reihenfolge)
                         .map((pt) => pt.titel.titel);
-                    // Titel, die nach dem Namen stehen
+
                     const afterTitles = person.person_hat_titel
                         .filter((pt) =>
                             pt.titel.titel_typ.titel_typ_bezeichnung.toLowerCase().includes("nach")
@@ -614,7 +667,8 @@ export default function PersonList() {
                         .sort((a, b) => a.reihenfolge - b.reihenfolge)
                         .map((pt) => pt.titel.titel);
 
-                    // Zusammensetzen: Falls keine Titel vorhanden sind, bleibt es der Standardname
+                    // Zusammensetzen des vollständigen Namens: Falls keine Titel vorhanden sind,
+                    // entspricht fullName einfach dem normalen Vor- und Nachnamen.
                     const fullName = `${beforeTitles.join(" ")} ${person.vorname} ${person.nachname} ${afterTitles.join(" ")}`.trim();
 
                     return (
@@ -685,12 +739,29 @@ export default function PersonList() {
                                             ))}
                                         </ul>
                                     </div>
-                                    {/* Hier als Zusatzinfo der vollständige Name mit Titeln */}
-                                    {person.person_hat_titel.length > 0 && (
-                                        <div className="mt-2 text-xs text-gray-600">
-                                            <strong>Vollständiger Name:</strong> {fullName}
-                                        </div>
-                                    )}
+                                    {/* Der vollständige Name mit Titeln wird immer angezeigt */}
+                                    <div className="mt-2 text-xs text-gray-600">
+                                        <strong>Vollständiger Name:</strong> {fullName}
+                                    </div>
+                                    {/* Delete-Button */}
+                                    <Form
+                                        method="post"
+                                        onSubmit={(e) => {
+                                            if (!confirm("Wollen Sie diese Person wirklich löschen?")) {
+                                                e.preventDefault();
+                                            }
+                                        }}
+                                        className="mt-4"
+                                    >
+                                        <input type="hidden" name="_action" value="delete"/>
+                                        <input type="hidden" name="person_id" value={person.person_id}/>
+                                        <button
+                                            type="submit"
+                                            className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+                                        >
+                                            Löschen
+                                        </button>
+                                    </Form>
                                 </div>
                             )}
                         </li>

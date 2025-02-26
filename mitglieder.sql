@@ -1,6 +1,3 @@
--- CREATE DATABASE IF NOT EXISTS cwp;
--- USE cwp;
-
 DROP TABLE IF EXISTS person_hat_email;
 DROP TABLE IF EXISTS person_hat_telefonnummer;
 DROP TABLE IF EXISTS person_hat_titel;
@@ -71,24 +68,26 @@ CREATE TABLE IF NOT EXISTS telefonnummer_typ (
     );
 
 CREATE TABLE IF NOT EXISTS telefonnummer (
-                                             telefonnummer_id INT UNSIGNED NOT NULL AUTO_INCREMENT,
-                                             telefonnummer VARCHAR(45) NULL,
-    telefonnummer_typ_id INT UNSIGNED NOT NULL,
+												 telefonnummer_id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+												 telefonnummer VARCHAR(45) NULL,
+												 telefonnummer_typ_id INT UNSIGNED NOT NULL,
     PRIMARY KEY (telefonnummer_id),
     INDEX idx_telefonnummer_typ (telefonnummer_typ_id),
+    UNIQUE KEY unique_telefonnummer_typ (telefonnummer, telefonnummer_typ_id),
     CONSTRAINT fk_telefonnummer_typ FOREIGN KEY (telefonnummer_typ_id) REFERENCES telefonnummer_typ (telefonnummer_typ_id)
-    );
+);
+
 
 CREATE TABLE IF NOT EXISTS titel_typ (
-                                                  titel_typ_id INT UNSIGNED NOT NULL AUTO_INCREMENT,
-                                                  titel_typ_bezeichnung VARCHAR(45) NOT NULL,
+                                         titel_typ_id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                                         titel_typ_bezeichnung VARCHAR(45) NOT NULL,
     PRIMARY KEY (titel_typ_id),
     UNIQUE INDEX titel_typ_bezeichnung_UNIQUE (titel_typ_bezeichnung ASC) VISIBLE
     );
 
 CREATE TABLE IF NOT EXISTS titel (
-                                              titel_id INT UNSIGNED NOT NULL AUTO_INCREMENT,
-                                              titel VARCHAR(45) NOT NULL,
+                                     titel_id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                                     titel VARCHAR(45) NOT NULL,
     titel_typ_id INT UNSIGNED NOT NULL,
     PRIMARY KEY (titel_id),
     UNIQUE INDEX titel_UNIQUE (titel ASC) VISIBLE,
@@ -115,6 +114,7 @@ CREATE TABLE IF NOT EXISTS mitgliedschaftszeitraum (
                                                        PRIMARY KEY (mitgliedschaftszeitraum_id),
     INDEX idx_person (person_id),
     CONSTRAINT fk_mitgliedschaftszeitraum_person FOREIGN KEY (person_id) REFERENCES person (person_id)
+    ON DELETE CASCADE
     );
 
 CREATE TABLE IF NOT EXISTS person_hat_titel (
@@ -124,7 +124,8 @@ CREATE TABLE IF NOT EXISTS person_hat_titel (
                                                 PRIMARY KEY (person_id, titel_id),
     INDEX idx_titel (titel_id),
     INDEX idx_person_titel (person_id),
-    CONSTRAINT fk_person_titel FOREIGN KEY (person_id) REFERENCES person (person_id),
+    CONSTRAINT fk_person_titel FOREIGN KEY (person_id) REFERENCES person (person_id)
+    ON DELETE CASCADE,
     CONSTRAINT fk_titel_person FOREIGN KEY (titel_id) REFERENCES titel (titel_id)
     );
 
@@ -134,7 +135,8 @@ CREATE TABLE IF NOT EXISTS person_hat_telefonnummer (
                                                         PRIMARY KEY (person_id, telefonnummer_id),
     INDEX idx_telefonnummer (telefonnummer_id),
     INDEX idx_person_telefonnummer (person_id),
-    CONSTRAINT fk_person_telefonnummer FOREIGN KEY (person_id) REFERENCES person (person_id),
+    CONSTRAINT fk_person_telefonnummer FOREIGN KEY (person_id) REFERENCES person (person_id)
+    ON DELETE CASCADE,
     CONSTRAINT fk_telefonnummer_person FOREIGN KEY (telefonnummer_id) REFERENCES telefonnummer (telefonnummer_id)
     );
 
@@ -144,6 +146,7 @@ CREATE TABLE IF NOT EXISTS person_hat_email (
                                                 PRIMARY KEY (person_id, email_id),
     INDEX idx_email (email_id),
     INDEX idx_person_email (person_id),
-    CONSTRAINT fk_person_email FOREIGN KEY (person_id) REFERENCES person (person_id),
+    CONSTRAINT fk_person_email FOREIGN KEY (person_id) REFERENCES person (person_id)
+    ON DELETE CASCADE,
     CONSTRAINT fk_email_person FOREIGN KEY (email_id) REFERENCES email (email_id)
     );
