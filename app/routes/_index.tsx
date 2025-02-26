@@ -17,6 +17,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         { name: "Titel", count: await prisma.titel.count() },
         { name: "Telefonnummertyp", count: await prisma.telefonnummer_typ.count() },
         { name: "Rolle", count: await prisma.rolle.count() },
+        { name: "Titeltyp", count: await prisma.titel_typ.count() },
     ];
 
     return json({ tables });

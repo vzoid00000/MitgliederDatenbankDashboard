@@ -16,6 +16,9 @@ export const loader = async ({request}: LoaderFunctionArgs) => {
             person_hat_telefonnummer: {
                 include: {telefonnummer: {include: {telefonnummer_typ: true}}},
             },
+            person_hat_titel: {
+                include: { titel: true }
+            },
             mitgliedschaftszeitraum: {
                 orderBy: {von: 'desc'},
             },
@@ -25,7 +28,8 @@ export const loader = async ({request}: LoaderFunctionArgs) => {
     const telefonnummerTypen = await prisma.telefonnummer_typ.findMany();
     const roles = await prisma.rolle.findMany();
     const statuses = await prisma.status.findMany();
-    return json({persons, geschlechter, telefonnummerTypen, roles, statuses});
+    const titles = await prisma.titel.findMany();
+    return json({persons, geschlechter, telefonnummerTypen, roles, statuses, titles});
 };
 
 
@@ -90,6 +94,8 @@ export const action = async ({request}: ActionFunctionArgs) => {
         const telefonnummern = formData.getAll("telefonnummern[]").filter(Boolean) as string[];
         const telefonnummerTypen = formData.getAll("telefonnummer_typen[]").filter(Boolean) as string[];
         const status_id = parseInt(formData.get("status_id") as string);
+        const titelIds = formData.getAll("titel_id[]").filter(Boolean) as string[];
+        const reihenfolgen = formData.getAll("reihenfolge[]").filter(Boolean) as string[];
 
         if (action === "create") {
             const newPerson = await prisma.person.create({
@@ -113,6 +119,14 @@ export const action = async ({request}: ActionFunctionArgs) => {
                                     telefonnummer_typ_id: parseInt(telefonnummerTypen[index]),
                                 },
                             },
+                        })),
+                    },
+                    person_hat_titel: {
+                        create: titelIds.map((titel_id, index) => ({
+                            titel: {
+                                connect: { titel_id: parseInt(titel_id, 10) },
+                            },
+                            reihenfolge: parseInt(reihenfolgen[index], 10),
                         })),
                     },
                 },
@@ -165,7 +179,7 @@ export const action = async ({request}: ActionFunctionArgs) => {
 
 
 export default function PersonList() {
-    const {persons, geschlechter, telefonnummerTypen, roles, statuses} = useLoaderData<typeof loader>();
+    const {persons, geschlechter, telefonnummerTypen, roles, statuses, titles } = useLoaderData<typeof loader>();
     const actionData = useActionData<{ error?: string; success?: string }>();
     const [editingPerson, setEditingPerson] = useState<number | null>(null);
     const [emails, setEmails] = useState<string[]>([""]);
@@ -173,6 +187,20 @@ export default function PersonList() {
         nummer: "",
         typ: "1"
     }]);
+    const [personTitles, setPersonTitles] = useState<Array<{ titel_id: string; reihenfolge: string }>>([
+        { titel_id: titles[0]?.titel_id.toString() || "", reihenfolge: "1" }
+    ]);
+
+    const addTitle = () =>
+        setPersonTitles([...personTitles, { titel_id: titles[0]?.titel_id.toString() || "", reihenfolge: "1" }]);
+    const removeTitle = (index: number) =>
+        setPersonTitles(personTitles.filter((_, i) => i !== index));
+    const updateTitle = (index: number, field: "titel_id" | "reihenfolge", value: string) => {
+        const newTitles = [...personTitles];
+        newTitles[index][field] = value;
+        setPersonTitles(newTitles);
+    };
+
     const [expanded, setExpanded] = useState<{ [key: number]: boolean }>({});
 
     const addEmail = () => setEmails([...emails, ""]);
@@ -494,6 +522,52 @@ export default function PersonList() {
                         Telefonnummer hinzufügen
                     </button>
                 </div>
+
+                {/* Titel zuweisen */}
+                <div className="mt-4">
+                    <label className="block mb-2">Titel</label>
+                    {personTitles.map((pt, index) => (
+                        <div key={index} className="flex mb-2 items-center">
+                            <select
+                                name="titel_id[]"
+                                value={pt.titel_id}
+                                onChange={(e) => updateTitle(index, "titel_id", e.target.value)}
+                                className="flex-grow p-2 border rounded"
+                            >
+                                {titles.map((t) => (
+                                    <option key={t.titel_id} value={t.titel_id}>
+                                        {t.titel}
+                                    </option>
+                                ))}
+                            </select>
+                            <input
+                                type="number"
+                                name="reihenfolge[]"
+                                value={pt.reihenfolge}
+                                onChange={(e) => updateTitle(index, "reihenfolge", e.target.value)}
+                                className="ml-2 p-2 border rounded w-20"
+                                min="1"
+                            />
+                            {index > 0 && (
+                                <button
+                                    type="button"
+                                    onClick={() => removeTitle(index)}
+                                    className="ml-2 px-2 py-1 bg-red-500 text-white rounded"
+                                >
+                                    Entfernen
+                                </button>
+                            )}
+                        </div>
+                    ))}
+                    <button
+                        type="button"
+                        onClick={addTitle}
+                        className="mt-2 px-4 py-2 bg-green-500 text-white rounded"
+                    >
+                        Titel hinzufügen
+                    </button>
+                </div>
+
 
                 <button
                     type="submit"

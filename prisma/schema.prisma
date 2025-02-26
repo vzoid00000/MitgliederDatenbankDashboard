@@ -7,32 +7,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
-model cwpmitglieder {
-  id                  String?   @db.VarChar(3)
-  nachname            String?   @db.VarChar(28)
-  vorname             String?   @db.VarChar(11)
-  geschlecht          String?   @db.VarChar(10)
-  titel               String?   @db.VarChar(10)
-  plz                 String?   @db.VarChar(4)
-  ort                 String?   @db.VarChar(25)
-  strasse             String?   @db.VarChar(30)
-  geburtsdatum        DateTime? @db.Date
-  mitgliedsnummer     String?   @db.VarChar(15)
-  schuetzenpassnummer Int?
-  handy               String?   @db.VarChar(19)
-  tel1                String?   @db.VarChar(24)
-  email               String?   @db.VarChar(29)
-  tel2                String?   @db.VarChar(15)
-  landesverband       Boolean
-  status              String?   @db.VarChar(36)
-  schluessel          Boolean
-  notizen             String?   @db.VarChar(62)
-  beitrittsdatum      DateTime? @db.Date
-
-  @@ignore
-}
-
 model email {
   email_id         Int                @id @default(autoincrement()) @db.UnsignedInt
   email_adresse    String?            @unique(map: "unique_email_adresse") @db.VarChar(45)
@@ -96,10 +70,11 @@ model person_hat_telefonnummer {
 }
 
 model person_hat_titel {
-  person_id Int    @db.UnsignedInt
-  titel_id  Int    @db.UnsignedInt
-  person    person @relation(fields: [person_id], references: [person_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_person_hat_titel_person")
-  titel     titel  @relation(fields: [titel_id], references: [titel_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_person_hat_titel_titel")
+  person_id   Int    @db.UnsignedInt
+  titel_id    Int    @db.UnsignedInt
+  reihenfolge Int    @db.UnsignedInt
+  person      person @relation(fields: [person_id], references: [person_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_person_hat_titel_person")
+  titel       titel  @relation(fields: [titel_id], references: [titel_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_person_hat_titel_titel")
 
   @@id([person_id, titel_id])
   @@index([person_id], map: "idx_person_titel")
@@ -130,8 +105,12 @@ model telefonnummer_typ {
 
 model titel {
   titel_id         Int                @id @default(autoincrement()) @db.UnsignedInt
-  titel            String             @unique(map: "unique_titel") @db.VarChar(45)
+  titel            String             @unique(map: "titel_UNIQUE") @db.VarChar(45)
+  titel_typ_id     Int                @db.UnsignedInt
   person_hat_titel person_hat_titel[]
+  titel_typ        titel_typ          @relation(fields: [titel_typ_id], references: [titel_typ_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_titel_titel_typ1")
+
+  @@index([titel_typ_id], map: "fk_titel_titel_typ1_idx")
 }
 
 model rolle {
@@ -149,4 +128,10 @@ model person_hat_email {
   @@id([person_id, email_id])
   @@index([email_id], map: "idx_email")
   @@index([person_id], map: "idx_person_email")
+}
+
+model titel_typ {
+  titel_typ_id          Int     @id @default(autoincrement()) @db.UnsignedInt
+  titel_typ_bezeichnung String  @unique(map: "titel_typ_bezeichnung_UNIQUE") @db.VarChar(45)
+  titel                 titel[]
 }

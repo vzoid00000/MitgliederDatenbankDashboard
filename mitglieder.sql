@@ -1,5 +1,5 @@
-CREATE DATABASE IF NOT EXISTS cwp;
-USE cwp;
+-- CREATE DATABASE IF NOT EXISTS cwp;
+-- USE cwp;
 
 DROP TABLE IF EXISTS person_hat_email;
 DROP TABLE IF EXISTS person_hat_telefonnummer;
@@ -7,6 +7,7 @@ DROP TABLE IF EXISTS person_hat_titel;
 DROP TABLE IF EXISTS mitgliedschaftszeitraum;
 DROP TABLE IF EXISTS email;
 DROP TABLE IF EXISTS titel;
+DROP TABLE IF EXISTS titel_typ;
 DROP TABLE IF EXISTS telefonnummer;
 DROP TABLE IF EXISTS telefonnummer_typ;
 DROP TABLE IF EXISTS person;
@@ -78,11 +79,25 @@ CREATE TABLE IF NOT EXISTS telefonnummer (
     CONSTRAINT fk_telefonnummer_typ FOREIGN KEY (telefonnummer_typ_id) REFERENCES telefonnummer_typ (telefonnummer_typ_id)
     );
 
+CREATE TABLE IF NOT EXISTS titel_typ (
+                                                  titel_typ_id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                                                  titel_typ_bezeichnung VARCHAR(45) NOT NULL,
+    PRIMARY KEY (titel_typ_id),
+    UNIQUE INDEX titel_typ_bezeichnung_UNIQUE (titel_typ_bezeichnung ASC) VISIBLE
+    );
+
 CREATE TABLE IF NOT EXISTS titel (
-                                     titel_id INT UNSIGNED NOT NULL AUTO_INCREMENT,
-                                     titel VARCHAR(45) NOT NULL,
+                                              titel_id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                                              titel VARCHAR(45) NOT NULL,
+    titel_typ_id INT UNSIGNED NOT NULL,
     PRIMARY KEY (titel_id),
-    UNIQUE INDEX unique_titel (titel ASC)
+    UNIQUE INDEX titel_UNIQUE (titel ASC) VISIBLE,
+    INDEX fk_titel_titel_typ1_idx (titel_typ_id ASC) VISIBLE,
+    CONSTRAINT fk_titel_titel_typ1
+    FOREIGN KEY (titel_typ_id)
+    REFERENCES titel_typ (titel_typ_id)
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION
     );
 
 CREATE TABLE IF NOT EXISTS email (
@@ -105,6 +120,7 @@ CREATE TABLE IF NOT EXISTS mitgliedschaftszeitraum (
 CREATE TABLE IF NOT EXISTS person_hat_titel (
                                                 person_id INT UNSIGNED NOT NULL,
                                                 titel_id INT UNSIGNED NOT NULL,
+                                                reihenfolge INT UNSIGNED NOT NULL,
                                                 PRIMARY KEY (person_id, titel_id),
     INDEX idx_titel (titel_id),
     INDEX idx_person_titel (person_id),
