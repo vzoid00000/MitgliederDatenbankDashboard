@@ -17,7 +17,9 @@ export const loader = async ({request}: LoaderFunctionArgs) => {
                 include: {telefonnummer: {include: {telefonnummer_typ: true}}},
             },
             person_hat_titel: {
-                include: { titel: true }
+                include: {
+                    titel: { include: { titel_typ: true } }
+                }
             },
             mitgliedschaftszeitraum: {
                 orderBy: {von: 'desc'},
@@ -595,10 +597,31 @@ export default function PersonList() {
                         person.mitgliedschaftszeitraum && person.mitgliedschaftszeitraum.length > 0
                             ? person.mitgliedschaftszeitraum.find((m) => m.bis === null) || person.mitgliedschaftszeitraum[0]
                             : null;
+
+                    // Vollständigen Namen inklusive Titel berechnen:
+                    // Titel, die vor dem Namen stehen
+                    const beforeTitles = person.person_hat_titel
+                        .filter((pt) =>
+                            pt.titel.titel_typ.titel_typ_bezeichnung.toLowerCase().includes("vor")
+                        )
+                        .sort((a, b) => a.reihenfolge - b.reihenfolge)
+                        .map((pt) => pt.titel.titel);
+                    // Titel, die nach dem Namen stehen
+                    const afterTitles = person.person_hat_titel
+                        .filter((pt) =>
+                            pt.titel.titel_typ.titel_typ_bezeichnung.toLowerCase().includes("nach")
+                        )
+                        .sort((a, b) => a.reihenfolge - b.reihenfolge)
+                        .map((pt) => pt.titel.titel);
+
+                    // Zusammensetzen: Falls keine Titel vorhanden sind, bleibt es der Standardname
+                    const fullName = `${beforeTitles.join(" ")} ${person.vorname} ${person.nachname} ${afterTitles.join(" ")}`.trim();
+
                     return (
                         <li key={person.person_id} className="bg-white p-4 rounded shadow">
                             <div className="flex justify-between items-center">
                                 <div>
+                                    {/* In der kompakten Ansicht nur Vor- und Nachname */}
                                     <h2 className="text-xl font-bold">
                                         {person.vorname} {person.nachname}
                                     </h2>
@@ -662,6 +685,12 @@ export default function PersonList() {
                                             ))}
                                         </ul>
                                     </div>
+                                    {/* Hier als Zusatzinfo der vollständige Name mit Titeln */}
+                                    {person.person_hat_titel.length > 0 && (
+                                        <div className="mt-2 text-xs text-gray-600">
+                                            <strong>Vollständiger Name:</strong> {fullName}
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </li>
