@@ -1,0 +1,2 @@
+docker:
+mysql container not having tables? -> create migrations in the remix_app container and rebuild both container

@@ -33,6 +33,6 @@ services:
     volumes:
       - .:/app
       - /app/node_modules
-    command: sh -c "npx prisma migrate deploy && npm run start"
+    command: sh -c "npm run build && npx prisma migrate deploy && npm run start"
 volumes:
   mysql_data:
