@@ -1,13 +1,37 @@
 import { json, LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
 import { useLoaderData, Link } from "@remix-run/react";
+import { Input, Card, List, Typography, Badge, Avatar } from 'antd';
+import {
+    Users,
+    Tags,
+    Award,
+    Phone,
+    UserCircle,
+    GraduationCap,
+    Search,
+} from 'lucide-react';
 import { prisma } from "~/db.server";
+import { useState } from "react";
 
-export const meta: MetaFunction = () => {
-    return [
-        { title: "Mitgliederdatenbank Dashboard" },
-        { name: "description", content: "Mitgliederdatenbank" },
-    ];
+const { Title } = Typography;
+
+const getIconForTable = (tableName: string) => {
+    switch (tableName.toLowerCase()) {
+        case 'person': return <Users className="w-5 h-5" />;
+        case 'geschlecht': return <UserCircle className="w-5 h-5" />;
+        case 'status': return <Tags className="w-5 h-5" />;
+        case 'titel': return <Award className="w-5 h-5" />;
+        case 'telefonnummertyp': return <Phone className="w-5 h-5" />;
+        case 'rolle': return <UserCircle className="w-5 h-5" />;
+        case 'titeltyp': return <GraduationCap className="w-5 h-5" />;
+        default: return null;
+    }
 };
+
+export const meta: MetaFunction = () => [
+    { title: "Mitgliederdatenbank Dashboard" },
+    { name: "description", content: "Mitgliederdatenbank" },
+];
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     const tables = [
@@ -19,28 +43,68 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         { name: "Rolle", count: await prisma.rolle.count() },
         { name: "Titeltyp", count: await prisma.titel_typ.count() },
     ];
-
     return json({ tables });
 };
 
 export default function Index() {
     const { tables } = useLoaderData<typeof loader>();
+    const [searchText, setSearchText] = useState('');
+
+    const filteredTables = tables.filter(table =>
+        table.name.toLowerCase().includes(searchText.toLowerCase())
+    );
 
     return (
-        <div className="container mx-auto p-4">
-            <h1 className="text-2xl font-bold mb-4">Mitgliederdatenbank Dashboard</h1>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {tables.map((table) => (
-                    <Link
-                        key={table.name}
-                        to={`/${table.name.toLowerCase()}`}
-                        className="block p-6 bg-white rounded-lg border border-gray-200 shadow-md hover:bg-gray-100"
-                    >
-                        <h2 className="text-xl font-bold">{table.name}</h2>
-                        <p className="mt-2">Anzahl der Einträge: {table.count}</p>
-                    </Link>
-                ))}
+        <>
+            <div className="bg-white px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+                <Title level={3} className="mb-0">Dashboard Overview</Title>
+                <Input
+                    placeholder="Search tables..."
+                    prefix={<Search className="w-4 h-4 text-gray-400" />}
+                    className="max-w-xs"
+                    value={searchText}
+                    onChange={e => setSearchText(e.target.value)}
+                />
             </div>
-        </div>
+
+            <div className="p-6">
+                <List
+                    grid={{ gutter: 16, column: 1 }}
+                    dataSource={filteredTables}
+                    renderItem={table => (
+                        <List.Item>
+                            <Link to={`/${table.name.toLowerCase()}`}>
+                                <Card hoverable className="w-full cursor-pointer transition-all duration-300 hover:shadow-lg">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center space-x-4">
+                                            <Avatar
+                                                size="large"
+                                                className="bg-blue-50 flex items-center justify-center"
+                                                icon={getIconForTable(table.name)}
+                                            />
+                                            <div>
+                                                <Title level={5} className="mb-0">{table.name}</Title>
+                                                <Typography.Text type="secondary">
+                                                    Manage {table.name.toLowerCase()} entries
+                                                </Typography.Text>
+                                            </div>
+                                        </div>
+                                        <Badge
+                                            count={table.count}
+                                            className="cursor-pointer"
+                                            style={{
+                                                backgroundColor: '#1890ff',
+                                                fontSize: '14px',
+                                                padding: '0 8px',
+                                            }}
+                                        />
+                                    </div>
+                                </Card>
+                            </Link>
+                        </List.Item>
+                    )}
+                />
+            </div>
+        </>
     );
 }

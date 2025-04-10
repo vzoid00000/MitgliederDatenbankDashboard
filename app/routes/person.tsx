@@ -31,10 +31,6 @@ export default function PersonList() {
                 <div className="mb-4 p-2 text-green-700 bg-green-100">{actionData.success}</div>
             )}
 
-            <Link to="/" className="text-blue-500 hover:underline mb-4 inline-block">
-                Zurück zum Dashboard
-            </Link>
-
             <PersonForm
                 editingPerson={editingPerson}
                 geschlechter={geschlechter}
