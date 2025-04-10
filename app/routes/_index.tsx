@@ -16,17 +16,20 @@ import { useState } from "react";
 const { Title } = Typography;
 
 const getIconForTable = (tableName: string) => {
+    const iconClass = "w-5 h-5 text-blue-600"; // you can tweak this color if needed
+
     switch (tableName.toLowerCase()) {
-        case 'person': return <Users className="w-5 h-5" />;
-        case 'geschlecht': return <UserCircle className="w-5 h-5" />;
-        case 'status': return <Tags className="w-5 h-5" />;
-        case 'titel': return <Award className="w-5 h-5" />;
-        case 'telefonnummertyp': return <Phone className="w-5 h-5" />;
-        case 'rolle': return <UserCircle className="w-5 h-5" />;
-        case 'titeltyp': return <GraduationCap className="w-5 h-5" />;
-        default: return null;
+        case 'person': return <Users className={iconClass} />;
+        case 'geschlecht': return <UserCircle className={iconClass} />;
+        case 'status': return <Tags className={iconClass} />;
+        case 'titel': return <Award className={iconClass} />;
+        case 'telefonnummertyp': return <Phone className={iconClass} />;
+        case 'rolle': return <UserCircle className={iconClass} />;
+        case 'titeltyp': return <GraduationCap className={iconClass} />;
+        default: return <Users className={iconClass} />;
     }
 };
+
 
 export const meta: MetaFunction = () => [
     { title: "Mitgliederdatenbank Dashboard" },
