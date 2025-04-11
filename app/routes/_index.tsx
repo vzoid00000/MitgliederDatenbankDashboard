@@ -8,7 +8,7 @@ import {
     Phone,
     UserCircle,
     GraduationCap,
-    Search,
+    Search, VenusAndMars,
 } from 'lucide-react';
 import { prisma } from "~/db.server";
 import { useState } from "react";
@@ -20,7 +20,7 @@ const getIconForTable = (tableName: string) => {
 
     switch (tableName.toLowerCase()) {
         case 'person': return <Users className={iconClass} />;
-        case 'geschlecht': return <UserCircle className={iconClass} />;
+        case 'geschlecht': return <VenusAndMars className={iconClass} />;
         case 'status': return <Tags className={iconClass} />;
         case 'titel': return <Award className={iconClass} />;
         case 'telefonnummertyp': return <Phone className={iconClass} />;

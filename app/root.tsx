@@ -19,7 +19,7 @@ import {
   Award,
   Phone,
   UserCircle,
-  GraduationCap,
+  GraduationCap, VenusAndMars,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -42,7 +42,7 @@ const getIconForTable = (tableName: string) => {
     case "person":
       return <Users className="w-5 h-5" />;
     case "geschlecht":
-      return <UserCircle className="w-5 h-5" />;
+      return <VenusAndMars className="w-5 h-5" />;
     case "status":
       return <Tags className="w-5 h-5" />;
     case "titel":

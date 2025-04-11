@@ -1,13 +1,10 @@
+// imports
 import { json, type LoaderFunctionArgs, type ActionFunctionArgs } from "@remix-run/node";
 import { useLoaderData, useFetcher } from "@remix-run/react";
 import { prisma } from "~/db.server";
 import { useState, useEffect } from "react";
-import {
-    Layout, Table, Button, Modal, Form as AntForm, Input, Card, Typography, Space, Tooltip
-} from 'antd';
-import {
-    PlusOutlined, EditOutlined, DeleteOutlined, InfoCircleOutlined
-} from '@ant-design/icons';
+import { Layout, Table, Button, Modal, Form as AntForm, Input, Card, Typography, Space, Tooltip, message } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined, InfoCircleOutlined } from '@ant-design/icons';
 
 const { Content } = Layout;
 const { Title } = Typography;
@@ -23,38 +20,61 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const formData = await request.formData();
     const action = formData.get("_action");
 
-    switch (action) {
-        case "create":
-        case "update":
-            const statusId = formData.get("status_id");
-            const statusData = {
-                status_bezeichnung: formData.get("status_bezeichnung") as string,
-            };
-
-            if (action === "create") {
+    try {
+        switch (action) {
+            case "create": {
+                const statusData = {
+                    status_bezeichnung: formData.get("status_bezeichnung") as string,
+                };
                 await prisma.status.create({ data: statusData });
-            } else {
+                return json({ result: "created" });
+            }
+
+            case "update": {
+                const statusId = formData.get("status_id");
+                const statusData = {
+                    status_bezeichnung: formData.get("status_bezeichnung") as string,
+                };
                 await prisma.status.update({
-                    where: { status_id: Number.parseInt(statusId as string) },
+                    where: { status_id: Number(statusId) },
                     data: statusData,
                 });
+                return json({ result: "updated" });
             }
-            break;
 
-        case "delete":
-            const deleteId = formData.get("status_id");
-            await prisma.status.delete({ where: { status_id: Number.parseInt(deleteId as string) } });
-            break;
+            case "delete": {
+                const deleteId = formData.get("status_id");
+                await prisma.status.delete({ where: { status_id: Number(deleteId) } });
+                return json({ result: "deleted" });
+            }
 
-        case "multiDelete":
-            const ids = formData.getAll("status_ids[]").map(id => Number(id));
-            await prisma.status.deleteMany({
-                where: { status_id: { in: ids } }
-            });
-            break;
+            case "multiDelete": {
+                const ids = formData.getAll("status_ids[]").map(id => Number(id));
+                await prisma.status.deleteMany({
+                    where: { status_id: { in: ids } }
+                });
+                return json({ result: "multiDeleted", count: ids.length });
+            }
+        }
+    } catch (error: any) {
+    console.error("Action Error:", error);
+
+    // Prisma Error: Unique Constraint Violation
+    if (error.code === "P2002") {
+        return json({
+            result: "error",
+            message: "Ein Status mit dieser Bezeichnung existiert bereits.",
+        });
     }
 
-    return null;
+    return json({
+        result: "error",
+        message: "Ein unbekannter Fehler ist aufgetreten.",
+    });
+}
+
+
+return json({ result: "unknown" });
 };
 
 export default function StatusList() {
@@ -77,6 +97,30 @@ export default function StatusList() {
             form.resetFields();
         }
     }, [editingStatus, form]);
+
+    useEffect(() => {
+        if (fetcher.data?.result) {
+            switch (fetcher.data.result) {
+                case "created":
+                    message.success("Status erfolgreich erstellt.");
+                    break;
+                case "updated":
+                    message.success("Status erfolgreich aktualisiert.");
+                    break;
+                case "deleted":
+                    message.success("Status erfolgreich gelöscht.");
+                    break;
+                case "multiDeleted":
+                    message.success(`${fetcher.data.count} Status erfolgreich gelöscht.`);
+                    break;
+                case "error":
+                    message.error(fetcher.data?.message || "Fehler bei der Aktion.");
+                    break;
+                default:
+                    message.info("Aktion abgeschlossen.");
+            }
+        }
+    }, [fetcher.data]);
 
     const handleModalCancel = () => {
         setIsModalVisible(false);
@@ -146,7 +190,7 @@ export default function StatusList() {
             <Card className="mb-6">
                 <Space align="center">
                     <Title level={3} style={{ margin: 0 }}>Status Verwaltung</Title>
-                    <Tooltip title="Hier können Sie die verschiedenen Status für Mitglieder verwalten. Status können beispielsweise 'Aktiv', 'Inaktiv', 'Ruhend' oder andere Zustände sein, die den aktuellen Stand eines Mitglieds beschreiben.">
+                    <Tooltip title="Ein Status beschreibt die aktuelle Zugehörigkeit oder Situation eines Mitglieds und beeinflusst beispielsweise Beiträge oder Vergünstigungen.">
                         <InfoCircleOutlined style={{ fontSize: '15px', color: '#1890ff' }} />
                     </Tooltip>
                 </Space>
@@ -235,6 +279,19 @@ export default function StatusList() {
                         onClick={async () => {
                             try {
                                 const values = await form.validateFields();
+
+                                // Wenn Bearbeitung aktiv ist, prüfen, ob sich etwas geändert hat
+                                if (
+                                    editingStatus &&
+                                    values.status_bezeichnung.trim() === editingStatus.status_bezeichnung.trim()
+                                ) {
+                                    message.info("Keine Änderungen vorgenommen.");
+                                    setIsModalVisible(false);
+                                    setEditingStatus(null);
+                                    form.resetFields();
+                                    return;
+                                }
+
                                 const formData = new FormData();
                                 formData.append("_action", editingStatus ? "update" : "create");
                                 formData.append("status_bezeichnung", values.status_bezeichnung);
