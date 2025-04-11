@@ -88,7 +88,7 @@ export default function Index() {
                                             <div>
                                                 <Title level={5} className="mb-0">{table.name}</Title>
                                                 <Typography.Text type="secondary">
-                                                    Manage {table.name.toLowerCase()} entries
+                                                    {table.name}-Table Einträge verwalten
                                                 </Typography.Text>
                                             </div>
                                         </div>

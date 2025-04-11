@@ -1,7 +1,12 @@
 import { json, type LoaderFunctionArgs, type ActionFunctionArgs } from "@remix-run/node"
-import { useLoaderData, Form, Link } from "@remix-run/react"
+import { useLoaderData, Form } from "@remix-run/react"
 import { prisma } from "~/db.server"
 import { useState } from "react"
+import {Layout, Table, Button, Modal, Form as AntForm, Input, Card, Typography, Space, Popconfirm, Tooltip} from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined, InfoCircleOutlined } from '@ant-design/icons';
+
+const { Content } = Layout;
+const { Title, Paragraph } = Typography;
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     const statuses = await prisma.status.findMany()
@@ -41,75 +46,142 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
 export default function StatusList() {
     const { statuses } = useLoaderData<typeof loader>()
-    const [editingStatus, setEditingStatus] = useState<number | null>(null)
+    const [isModalVisible, setIsModalVisible] = useState(false);
+    const [editingStatus, setEditingStatus] = useState<{ status_id: number; status_bezeichnung: string } | null>(null);
+    const [form] = AntForm.useForm();
+
+    const handleModalOk = () => {
+        form.submit();
+    };
+
+    const handleModalCancel = () => {
+        setIsModalVisible(false);
+        setEditingStatus(null);
+        form.resetFields();
+    };
+
+    const columns = [
+        {
+            title: 'Status Bezeichnung',
+            dataIndex: 'status_bezeichnung',
+            key: 'status_bezeichnung',
+        },
+        {
+            title: '',
+            key: 'actions',
+            align: 'right',
+            render: (_: any, record: any) => (
+                <div style={{ textAlign: 'right', width: '100%' }}>
+                    <Space>
+                        <Button
+                            icon={<EditOutlined />}
+                            onClick={() => {
+                                setEditingStatus(record);
+                                form.setFieldsValue(record);
+                                setIsModalVisible(true);
+                            }}
+                            type="link"
+                        >
+                            Bearbeiten
+                        </Button>
+                        <Form method="post">
+                            <input type="hidden" name="_action" value="delete" />
+                            <input type="hidden" name="status_id" value={record.status_id} />
+                            <Popconfirm
+                                title="Status löschen"
+                                description="Sind Sie sicher, dass Sie diesen Status löschen möchten?"
+                                onConfirm={() => {
+                                    const form = document.createElement('form');
+                                    form.method = 'post';
+                                    form.innerHTML = `
+                                    <input type="hidden" name="_action" value="delete" />
+                                    <input type="hidden" name="status_id" value="${record.status_id}" />
+                                `;
+                                    document.body.appendChild(form);
+                                    form.submit();
+                                    document.body.removeChild(form);
+                                }}
+                                okText="Ja"
+                                cancelText="Nein"
+                            >
+                                <Button type="link" danger icon={<DeleteOutlined />}>
+                                    Löschen
+                                </Button>
+                            </Popconfirm>
+                        </Form>
+                    </Space>
+                </div>
+            ),
+        },
+    ];
+
 
     return (
-        <div className="container mx-auto p-4">
-            <h1 className="text-2xl font-bold mb-4">Statusliste</h1>
-            <Link to="/" className="text-blue-500 hover:underline mb-4 inline-block">
-                Zurück zum Dashboard
-            </Link>
+        <Content className="p-6">
+            <Card className="mb-6">
+                <Space align="center">
+                    <Title level={3} style={{ margin: 0 }}>Status Verwaltung</Title>
+                    <Tooltip title="Hier können Sie die verschiedenen Status für Mitglieder verwalten. Status können beispielsweise 'Aktiv', 'Inaktiv', 'Ruhend' oder andere Zustände sein, die den aktuellen Stand eines Mitglieds beschreiben.">
+                        <InfoCircleOutlined style={{ fontSize: '15px', color: '#1890ff' }} />
+                    </Tooltip>
+                </Space>
+            </Card>
 
-            <Form method="post" className="mb-8 p-4 bg-gray-100 rounded">
-                <input type="hidden" name="_action" value={editingStatus ? "update" : "create"} />
-                {editingStatus && <input type="hidden" name="status_id" value={editingStatus} />}
-                <div>
-                    <label htmlFor="status_bezeichnung" className="block">
-                        Status Bezeichnung
-                    </label>
-                    <input
-                        type="text"
-                        id="status_bezeichnung"
-                        name="status_bezeichnung"
-                        required
-                        className="w-full p-2 border rounded"
-                    />
-                </div>
-                <button type="submit" className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
-                    {editingStatus ? "Aktualisieren" : "Erstellen"}
-                </button>
-                {editingStatus && (
-                    <button
-                        type="button"
-                        onClick={() => setEditingStatus(null)}
-                        className="mt-4 ml-2 px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
+            <Card
+                title={<Space><Title level={4} style={{ margin: 0 }}>Status Liste</Title></Space>}
+                extra={
+                    <Button
+                        type="primary"
+                        icon={<PlusOutlined />}
+                        onClick={() => {
+                            setEditingStatus(null);
+                            form.resetFields();
+                            setIsModalVisible(true);
+                        }}
                     >
-                        Abbrechen
-                    </button>
-                )}
-            </Form>
+                        Neuer Status
+                    </Button>
+                }
+            >
+                <Table
+                    dataSource={statuses}
+                    columns={columns}
+                    rowKey="status_id"
+                    pagination={{ pageSize: 10 }}
+                />
+            </Card>
 
-            <ul className="space-y-4">
-                {statuses.map((status) => (
-                    <li key={status.status_id} className="bg-white p-4 rounded shadow flex justify-between items-center">
-                        <span>{status.status_bezeichnung}</span>
-                        <div>
-                            <button
-                                onClick={() => setEditingStatus(status.status_id)}
-                                className="px-3 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600 mr-2"
-                            >
-                                Bearbeiten
-                            </button>
-                            <Form method="post" style={{ display: "inline" }}>
-                                <input type="hidden" name="_action" value="delete" />
-                                <input type="hidden" name="status_id" value={status.status_id} />
-                                <button
-                                    type="submit"
-                                    className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600"
-                                    onClick={(e) => {
-                                        if (!confirm("Sind Sie sicher, dass Sie diesen Status löschen möchten?")) {
-                                            e.preventDefault()
-                                        }
-                                    }}
-                                >
-                                    Löschen
-                                </button>
-                            </Form>
-                        </div>
-                    </li>
-                ))}
-            </ul>
-        </div>
+            <Modal
+                title={editingStatus ? "Status bearbeiten" : "Neuer Status"}
+                open={isModalVisible}
+                onCancel={handleModalCancel}
+                footer={[
+                    <Button key="cancel" onClick={handleModalCancel}>
+                        Abbrechen
+                    </Button>,
+                    <Button key="submit" type="primary" onClick={() => document.getElementById("status-form")?.requestSubmit()}>
+                        {editingStatus ? "Aktualisieren" : "Erstellen"}
+                    </Button>,
+                ]}
+            >
+                <form method="post" id="status-form">
+                    <input type="hidden" name="_action" value={editingStatus ? "update" : "create"} />
+                    {editingStatus && (
+                        <input type="hidden" name="status_id" value={editingStatus.status_id} />
+                    )}
+
+                    <div style={{ marginBottom: '1rem' }}>
+                        <label style={{ display: 'block', marginBottom: '0.5rem' }}>Status Bezeichnung</label>
+                        <Input
+                            name="status_bezeichnung"
+                            required
+                            defaultValue={editingStatus?.status_bezeichnung || ""}
+                        />
+                    </div>
+                </form>
+            </Modal>
+
+
+        </Content>
     )
 }
-
