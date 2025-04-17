@@ -31,23 +31,174 @@ import {
     IdcardOutlined, LeftOutlined, RightOutlined
 } from "@ant-design/icons";
 import dayjs from "dayjs";
+import { LoaderFunction, json, ActionFunction, redirect } from "@remix-run/node";
+import {useLoaderData, useSubmit} from "@remix-run/react";
+import { prisma } from "~/db.server";
+
+export const loader: LoaderFunction = async () => {
+    try {
+        const [geschlechter, rollen, status] = await Promise.all([
+            prisma.geschlecht.findMany(),
+            prisma.rolle.findMany(),
+            prisma.status.findMany()
+        ]);
+
+
+        const personen = await prisma.person.findMany({
+            include: {
+                geschlecht: true,
+                person_hat_email: {
+                    include: { email: true }
+                },
+                person_hat_telefonnummer: {
+                    include: { telefonnummer: true }
+                },
+                person_hat_status: {
+                    include: { status: true }
+                },
+                person_hat_rolle: {
+                    include: { rolle: true }
+                }
+            }
+        });
+
+
+        return json({ geschlechter, rollen, status, personen });
+
+    } catch (e) {
+        console.error("Loader error:", e);
+        return json({ geschlechter: [], rollen: [], status: [] });
+    }
+};
+
+export const action: ActionFunction = async ({ request }) => {
+    const formData = await request.formData();
+    const actionType = formData.get("_action");
+    const raw = Object.fromEntries(formData);
+
+    if (actionType === "delete") {
+        const personId = Number(formData.get("person_id"));
+        if (!personId) throw new Error("Ungültige person_id");
+
+        try {
+            await prisma.person.delete({
+                where: { person_id: personId }
+            });
+            return redirect("/person");
+        } catch (e) {
+            console.error("Fehler beim Löschen:", e);
+            throw new Error("Fehler beim Löschen");
+        }
+    }
+
+
+    const vorname = raw.vorname as string;
+    const nachname = raw.nachname as string;
+    const voller_name = raw.voller_name as string;
+    const geburtsdatum = raw.geburtsdatum ? new Date(raw.geburtsdatum as string) : null;
+    const geschlecht_id_raw = raw.geschlecht_id as string;
+    const geschlecht_id = geschlecht_id_raw && !isNaN(Number(geschlecht_id_raw))
+        ? parseInt(geschlecht_id_raw)
+        : null;
+
+    console.log("📥 geschlecht_id_raw:", raw.geschlecht_id);
+    console.log("📥 parsed geschlecht_id:", geschlecht_id);
+
+    const ist_landesverband_gemeldet = raw.ist_landesverband_gemeldet === "on" ? 1 : 0;
+    const hat_schluessel_suessenbrunn = raw.hat_schluessel_suessenbrunn === "on" ? 1 : 0;
+    const mitgliedsnummer = raw.mitgliedsnummer ? parseInt(raw.mitgliedsnummer as string) : null;
+    const schuetzenpassnummer = raw.schuetzenpassnummer ? parseInt(raw.schuetzenpassnummer as string) : null;
+    const beitrittsdatum = raw.beitrittsdatum ? new Date(raw.beitrittsdatum as string) : null;
+    const username = raw.username as string;
+    const notiz = raw.notiz as string;
+
+    const rollen = JSON.parse(raw.rollen as string); // array of ids
+    const status = JSON.parse(raw.status as string); // array of ids
+
+    const emails = JSON.parse(raw.emails as string); // array of {adresse}
+    const telefonnummern = JSON.parse(raw.telefonnummern as string); // array of {nummer, typ}
+
+    const validEmails = emails.filter((e: any) => e.adresse?.trim());
+    const validPhones = telefonnummern.filter((t: any) => t.nummer?.trim() && t.typ?.trim());
+
+    if (!geschlecht_id || isNaN(geschlecht_id)) {
+        throw new Error("Ungültige geschlecht_id");
+    }
+
+    try {
+        const person = await prisma.person.create({
+            data: {
+                vorname,
+                nachname,
+                voller_name,
+                geburtsdatum,
+                geschlecht: {
+                    connect: { geschlecht_id }
+                },
+                ist_landesverband_gemeldet: ist_landesverband_gemeldet ? 1 : 0,
+                hat_schluessel_suessenbrunn: hat_schluessel_suessenbrunn ? 1 : 0,
+                mitgliedsnummer,
+                schuetzenpassnummer,
+                username,
+                notiz,
+                mitgliedschaftszeitraum: beitrittsdatum
+                    ? {
+                        create: [
+                            {
+                                von: beitrittsdatum,
+                                bis: null
+                            }
+                        ]
+                    }
+                    : undefined,
+                person_hat_email: {
+                    create: validEmails.map((email: any) => ({
+                        email: { create: { email_adresse: email.adresse } }
+                    }))
+                },
+                person_hat_telefonnummer: {
+                    create: validPhones.map((tel: any) => ({
+                        telefonnummer: {
+                            create: {
+                                telefonnummer: tel.nummer,
+                                telefonnummer_typ: {
+                                    connect: { telefonnummer_typ: tel.typ } // ← falls "typ" ein String ist, sonst ID!
+                                }
+                            }
+                        }
+                    }))
+                },
+                person_hat_rolle: {
+                    create: rollen.map((rolle_id: number) => ({
+                        rolle: { connect: { rolle_id } }
+                    }))
+                },
+                person_hat_status: {
+                    create: status.map((status_id: number) => ({
+                        status: { connect: { status_id } }
+                    }))
+                }
+            }
+        });
+
+        return redirect("/person");
+    } catch (error) {
+        console.error("Fehler beim Erstellen:", error);
+        throw new Error("Fehler beim Erstellen");
+    }
+};
 
 const {Content} = Layout;
 const {Title, Text} = Typography;
 const {Option} = Select;
 const {Step} = Steps;
 
-// MOCK: später durch echten DB‑Call ersetzen
-const allStatuses = [
-    {status_id: 1, status_bezeichnung: "Aktiv"},
-    {status_id: 3, status_bezeichnung: "Ruhend"}
-];
-const allRollen = [
-    {rolle_id: 2, rolle_bezeichnung: "Mitglied"},
-    {rolle_id: 3, rolle_bezeichnung: "Trainerin"}
-];
-
 export default function PersonPage() {
+
+    const data = useLoaderData<typeof loader>();
+    const { geschlechter, rollen, status, personen } = data;
+    const persons = personen;
+
     // Filter‑State
     const [searchName, setSearchName] = useState("");
     const [searchMitgliedsnummer, setSearchMitgliedsnummer] = useState("");
@@ -70,72 +221,11 @@ export default function PersonPage() {
     const [titelInput, setTitelInput] = useState("");
     const [form] = Form.useForm();
 
-    // mock persons
-    const persons = [
-        {
-            person_id: 1,
-            vorname: "Max",
-            nachname: "Mustermann",
-            voller_name: "Dr. Max Mustermann",
-            geburtsdatum: "1990-05-15",
-            mitgliedsnummer: 1001,
-            schuetzenpassnummer: 5001,
-            strasse: "Hauptstraße 1",
-            ort: "Wien",
-            plz: "1010",
-            geschlecht_id: 1,
-            ist_landesverband_gemeldet: 1,
-            hat_schluessel_suessenbrunn: 1,
-            username: "max.mustermann",
-            notiz: "Langjähriges Mitglied",
-            person_hat_status: [
-                {status: {status_id: 1, status_bezeichnung: "Aktiv"}},
-                {status: {status_id: 3, status_bezeichnung: "Ruhend"}}
-            ],
-            person_hat_rolle: [
-                {rolle: {rolle_id: 2, rolle_bezeichnung: "Mitglied"}}
-            ],
-            person_hat_email: [
-                {email: {email_id: 1, email_adresse: "max@example.com"}},
-                {email: {email_id: 2, email_adresse: "mustermann@example.com"}}
-            ],
-            person_hat_telefonnummer: [
-                {telefonnummer: {telefonnummer_id: 1, telefonnummer: "+43 1234567"}},
-                {telefonnummer: {telefonnummer_id: 2, telefonnummer: "+43 7654321"}}
-            ],
-            geschlecht: {geschlecht: "M"}
-        },
-        {
-            person_id: 2,
-            vorname: "Anna",
-            nachname: "Schmidt",
-            voller_name: "Dr. Mag. Anna Schmidt Ing.",
-            geburtsdatum: "1992-08-10",
-            mitgliedsnummer: 1002,
-            schuetzenpassnummer: 5002,
-            strasse: "Lindenweg 5",
-            ort: "Graz",
-            plz: "8010",
-            geschlecht_id: 2,
-            ist_landesverband_gemeldet: 0,
-            hat_schluessel_suessenbrunn: 0,
-            username: "anna.schmidt",
-            notiz: "Neue Schützin",
-            person_hat_status: [
-                {status: {status_id: 1, status_bezeichnung: "Aktiv"}}
-            ],
-            person_hat_rolle: [
-                {rolle: {rolle_id: 3, rolle_bezeichnung: "Trainerin"}}
-            ],
-            person_hat_email: [
-                {email: {email_id: 3, email_adresse: "anna.schmidt@example.com"}}
-            ],
-            person_hat_telefonnummer: [
-                {telefonnummer: {telefonnummer_id: 3, telefonnummer: "+43 9876543"}}
-            ],
-            geschlecht: {geschlecht: "W"}
-        }
-    ];
+
+    const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+    const [personToDelete, setPersonToDelete] = useState<any>(null);
+    const [confirmNameInput, setConfirmNameInput] = useState("");
+
 
     // Filter‑Logik
     const filteredPersons = useMemo(() => {
@@ -270,45 +360,80 @@ export default function PersonPage() {
             title: "Aktionen",
             key: "actions",
             fixed: "right",
-            render: () => (
+            render: (record) => (
                 <Space>
-                    <Button type="text" icon={<EditOutlined/>}>
+                    <Button type="text" icon={<EditOutlined />}>
                         Bearbeiten
                     </Button>
-                    <Button type="text" danger icon={<DeleteOutlined/>}>
+                    <Button
+                        type="text"
+                        danger
+                        icon={<DeleteOutlined />}
+                        onClick={() => {
+                            setPersonToDelete(record);
+                            setDeleteModalVisible(true);
+                        }}
+                    >
                         Löschen
                     </Button>
                 </Space>
             )
+
         }
     ];
 
-    // Submit‑Handler
-    const handleFormSubmit = async (values: any) => {
-        try {
-            const voller_name = nameOrderList
-                .map(part => {
-                    if (part === "VORNAME") return values.vorname;
-                    if (part === "NACHNAME") return values.nachname;
-                    return part;
-                })
-                .join(" ");
-            values.voller_name = voller_name;
+    const submit = useSubmit();
 
-            console.log("Neue Person:", values);
-            message.success("Person erfolgreich hinzugefügt");
-            setIsModalVisible(false);
-            setCurrentStep(0);
-            form.resetFields();
-            setVornameInput("");
-            setNachnameInput("");
-            setTitelInput("");
-            setNameOrderList(["NAME"]);
+    const handleFormSubmit = async () => {
+        const values = form.getFieldsValue(true);
 
-        } catch {
-            message.error("Fehler beim Hinzufügen");
+        const resolvedNameOrder = nameOrderList.flatMap(part =>
+            part === "NAME" ? ["VORNAME", "NACHNAME"] : [part]
+        );
+
+        const voller_name = resolvedNameOrder
+            .map(part => {
+                if (part === "VORNAME") return values.vorname;
+                if (part === "NACHNAME") return values.nachname;
+                return part;
+            })
+            .join(" ");
+
+        const formData = new FormData();
+
+        formData.append("vorname", values.vorname ?? "");
+        formData.append("nachname", values.nachname ?? "");
+        formData.append("voller_name", voller_name);
+        formData.append("geburtsdatum", values.geburtsdatum ?? "");
+
+        if (values.geschlecht_id != null && values.geschlecht_id !== "") {
+            formData.append("geschlecht_id", String(values.geschlecht_id));
+        } else {
+            console.warn("⚠️ Kein geschlecht_id gesetzt – möglicherweise leer!");
         }
+
+        formData.append("mitgliedsnummer", values.mitgliedsnummer ?? "");
+        formData.append("schuetzenpassnummer", values.schuetzenpassnummer ?? "");
+        formData.append("beitrittsdatum", values.beitrittsdatum ?? "");
+        formData.append("ist_landesverband_gemeldet", values.ist_landesverband_gemeldet ? "on" : "");
+        formData.append("hat_schluessel_suessenbrunn", values.hat_schluessel_suessenbrunn ? "on" : "");
+        formData.append("username", values.username ?? "");
+        formData.append("notiz", values.notiz ?? "");
+
+        formData.append("emails", JSON.stringify(values.emails || []));
+        formData.append("telefonnummern", JSON.stringify(values.telefonnummern || []));
+        formData.append("rollen", JSON.stringify(values.rollen || []));
+        formData.append("status", JSON.stringify(values.status || []));
+
+        for (const [key, value] of formData.entries()) {
+            console.log(`📦 FormData: ${key} = ${value}`);
+        }
+
+        submit(formData, { method: "post" });
     };
+
+
+
 
 
     // Schritt‑vorwärts nur wenn die nötigen Felder erfüllt sind
@@ -404,9 +529,9 @@ export default function PersonPage() {
                             allowClear
                             value={selectedStatus}
                             onChange={setSelectedStatus}
-                            style={{width: 200}}
+                            style={{ width: 200 }}
                         >
-                            {allStatuses.map(s => (
+                            {status.map(s => (
                                 <Option key={s.status_id} value={s.status_id}>
                                     {s.status_bezeichnung}
                                 </Option>
@@ -418,9 +543,9 @@ export default function PersonPage() {
                             allowClear
                             value={selectedRolle}
                             onChange={setSelectedRolle}
-                            style={{width: 200}}
+                            style={{ width: 200 }}
                         >
-                            {allRollen.map(r => (
+                            {rollen.map(r => (
                                 <Option key={r.rolle_id} value={r.rolle_id}>
                                     {r.rolle_bezeichnung}
                                 </Option>
@@ -459,7 +584,7 @@ export default function PersonPage() {
 
             <Modal
                 title="Neue Person anlegen"
-                visible={isModalVisible}
+                open={isModalVisible}
                 onCancel={() => {
                     setIsModalVisible(false);
                     setCurrentStep(0);
@@ -483,7 +608,8 @@ export default function PersonPage() {
                 <Form
                     form={form}
                     layout="vertical"
-                    onFinish={handleFormSubmit}
+                    method="post"
+                    preserve={true}
                     initialValues={{
                         ist_landesverband_gemeldet: false,
                         hat_schluessel_suessenbrunn: false,
@@ -639,12 +765,14 @@ export default function PersonPage() {
                                     <Form.Item
                                         name="geschlecht_id"
                                         label="Geschlecht"
-                                        rules={[{required: true, message: "Bitte Geschlecht wählen"}]}
+                                        rules={[{ required: true, message: "Bitte Geschlecht wählen" }]}
                                     >
                                         <Select placeholder="Geschlecht wählen">
-                                            <Option value={1}>M</Option>
-                                            <Option value={2}>W</Option>
-                                            <Option value={3}>D</Option>
+                                            {geschlechter.map(g => (
+                                                <Option key={g.geschlecht_id} value={g.geschlecht_id}>
+                                                    {g.geschlecht}
+                                                </Option>
+                                            ))}
                                         </Select>
                                     </Form.Item>
                                 </Col>
@@ -822,6 +950,47 @@ export default function PersonPage() {
                                 </Form.Item>
                             </Col>
 
+                            {/* Rollen-Auswahl */}
+                            <Col span={12}>
+                                <Form.Item
+                                    name="rollen"
+                                    label="Rollen"
+                                >
+                                    <Select
+                                        mode="multiple"
+                                        placeholder="Rollen wählen"
+                                        allowClear
+                                    >
+                                        {rollen.map(r => (
+                                            <Option key={r.rolle_id} value={r.rolle_id}>
+                                                {r.rolle_bezeichnung}
+                                            </Option>
+                                        ))}
+                                    </Select>
+                                </Form.Item>
+                            </Col>
+
+                            {/* Status-Auswahl */}
+                            <Col span={12}>
+                                <Form.Item
+                                    name="status"
+                                    label="Status"
+                                    rules={[{ required: true, message: "Mindestens ein Status wählen" }]}
+                                >
+                                    <Select
+                                        mode="multiple"
+                                        placeholder="Status wählen"
+                                        allowClear
+                                    >
+                                        {status.map(s => (
+                                            <Option key={s.status_id} value={s.status_id}>
+                                                {s.status_bezeichnung}
+                                            </Option>
+                                        ))}
+                                    </Select>
+                                </Form.Item>
+                            </Col>
+
                             {/* Beitrittsdatum über volle Breite */}
                             <Col span={24}>
                                 <Form.Item name="beitrittsdatum" label="Beitrittsdatum">
@@ -871,7 +1040,17 @@ export default function PersonPage() {
                                 </Button>
                             )}
                             {currentStep === 3 && (
-                                <Button type="primary" htmlType="submit">
+                                <Button
+                                    type="primary"
+                                    onClick={async () => {
+                                        try {
+                                            await form.validateFields();
+                                            handleFormSubmit();
+                                        } catch (e) {
+                                            console.warn("🚫 Validation failed");
+                                        }
+                                    }}
+                                >
                                     Speichern
                                 </Button>
                             )}
@@ -879,6 +1058,71 @@ export default function PersonPage() {
                     </Form.Item>
                 </Form>
             </Modal>
+
+
+            <Modal
+                title="Person löschen"
+                open={deleteModalVisible}
+                onCancel={() => {
+                    setDeleteModalVisible(false);
+                    setPersonToDelete(null);
+                    setConfirmNameInput(""); // Reset input
+                }}
+                footer={[
+                    <Button
+                        key="cancel"
+                        onClick={() => {
+                            setDeleteModalVisible(false);
+                            setPersonToDelete(null);
+                            setConfirmNameInput(""); // Reset input
+                        }}
+                    >
+                        Abbrechen
+                    </Button>,
+                    <Button
+                        key="delete"
+                        danger
+                        type="primary"
+                        disabled={
+                            !personToDelete ||
+                            confirmNameInput.trim() !==
+                            (personToDelete?.voller_name?.trim() ||
+                                `${personToDelete?.vorname} ${personToDelete?.nachname}`.trim())
+                        }
+                        onClick={() => {
+                            if (personToDelete) {
+                                const formData = new FormData();
+                                formData.append("_action", "delete");
+                                formData.append("person_id", personToDelete.person_id.toString());
+                                submit(formData, { method: "post" });
+
+                                setDeleteModalVisible(false);
+                                setPersonToDelete(null);
+                                setConfirmNameInput(""); // Reset input
+                            }
+                        }}
+                    >
+                        Ja, löschen
+                    </Button>,
+                ]}
+            >
+                <p>
+                    Möchten Sie <strong>{personToDelete?.voller_name || `${personToDelete?.vorname} ${personToDelete?.nachname}`}</strong> wirklich löschen?
+                </p>
+                <p>
+                    Bitte geben Sie den vollständigen Namen ein, um die Löschung zu bestätigen:
+                </p>
+                <div style={{ paddingTop: 12 }}>
+                    <Input
+                        value={confirmNameInput}
+                        onChange={e => setConfirmNameInput(e.target.value)}
+                        placeholder="Vorname Nachname"
+                    />
+                </div>
+            </Modal>
+
+
         </Content>
+
     );
 }
