@@ -7,8 +7,8 @@ import {
     Award,
     Phone,
     UserCircle,
-    GraduationCap,
-    Search, VenusAndMars,
+    Search,
+    VenusAndMars,
 } from 'lucide-react';
 import { prisma } from "~/db.server";
 import { useState } from "react";
@@ -16,7 +16,7 @@ import { useState } from "react";
 const { Title } = Typography;
 
 const getIconForTable = (tableName: string) => {
-    const iconClass = "w-5 h-5 text-blue-600"; // you can tweak this color if needed
+    const iconClass = "w-5 h-5 text-blue-600";
 
     switch (tableName.toLowerCase()) {
         case 'person': return <Users className={iconClass} />;
@@ -25,11 +25,9 @@ const getIconForTable = (tableName: string) => {
         case 'titel': return <Award className={iconClass} />;
         case 'telefonnummertyp': return <Phone className={iconClass} />;
         case 'rolle': return <UserCircle className={iconClass} />;
-        case 'titeltyp': return <GraduationCap className={iconClass} />;
         default: return <Users className={iconClass} />;
     }
 };
-
 
 export const meta: MetaFunction = () => [
     { title: "Mitgliederdatenbank Dashboard" },
@@ -44,7 +42,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         { name: "Titel", count: await prisma.titel.count() },
         { name: "Telefonnummertyp", count: await prisma.telefonnummer_typ.count() },
         { name: "Rolle", count: await prisma.rolle.count() },
-        { name: "Titeltyp", count: await prisma.titel_typ.count() },
+        // Titeltyp entfernt
     ];
     return json({ tables });
 };

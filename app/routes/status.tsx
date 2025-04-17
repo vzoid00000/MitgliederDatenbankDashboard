@@ -1,4 +1,4 @@
-// imports
+// status.tsx
 import { json, type LoaderFunctionArgs, type ActionFunctionArgs } from "@remix-run/node";
 import { useLoaderData, useFetcher } from "@remix-run/react";
 import { prisma } from "~/db.server";

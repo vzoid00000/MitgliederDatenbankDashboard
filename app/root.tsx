@@ -19,11 +19,11 @@ import {
   Award,
   Phone,
   UserCircle,
-  GraduationCap, VenusAndMars,
+  VenusAndMars,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
-// Same table list for simplicity – you can refactor this into a separate module if needed
+// Tabelle "Titeltyp" entfernt
 const tableNames = [
   "Person",
   "Geschlecht",
@@ -31,7 +31,6 @@ const tableNames = [
   "Titel",
   "Telefonnummertyp",
   "Rolle",
-  "Titeltyp",
 ];
 
 const { Sider } = Layout;
@@ -51,8 +50,6 @@ const getIconForTable = (tableName: string) => {
       return <Phone className="w-5 h-5" />;
     case "rolle":
       return <UserCircle className="w-5 h-5" />;
-    case "titeltyp":
-      return <GraduationCap className="w-5 h-5" />;
     default:
       return <LayoutDashboard className="w-5 h-5" />;
   }
@@ -101,7 +98,9 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
           <Menu
               mode="inline"
               selectedKeys={[
-                location.pathname === "/" ? "dashboard" : location.pathname.replace("/", ""),
+                location.pathname === "/"
+                    ? "dashboard"
+                    : location.pathname.replace("/", ""),
               ]}
               onClick={({ key }) => {
                 if (key === "dashboard") {
@@ -124,10 +123,7 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
               ]}
           />
         </Sider>
-        <Layout className="bg-white">
-          {/* Here you inject all page content */}
-          {children}
-        </Layout>
+        <Layout className="bg-white">{children}</Layout>
       </Layout>
       <ScrollRestoration />
       <Scripts />
@@ -137,9 +133,5 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
-  return (
-      <LayoutWrapper>
-        <Outlet />
-      </LayoutWrapper>
-  );
+  return <LayoutWrapper><Outlet /></LayoutWrapper>;
 }

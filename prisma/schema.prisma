@@ -7,6 +7,11 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum TitelPosition {
+  VOR
+  NACH
+}
+
 model email {
   email_id         Int                @id @default(autoincrement()) @db.UnsignedInt
   email_adresse    String?            @unique(map: "unique_email_adresse") @db.VarChar(45)
@@ -144,15 +149,6 @@ model telefonnummer_typ {
 model titel {
   titel_id         Int                @id @default(autoincrement()) @db.UnsignedInt
   titel            String             @unique(map: "titel_UNIQUE") @db.VarChar(45)
-  titel_typ_id     Int                @db.UnsignedInt
+  position         TitelPosition      @default(VOR)
   person_hat_titel person_hat_titel[]
-  titel_typ        titel_typ          @relation(fields: [titel_typ_id], references: [titel_typ_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_titel_titel_typ1")
-
-  @@index([titel_typ_id], map: "fk_titel_titel_typ1_idx")
-}
-
-model titel_typ {
-  titel_typ_id          Int     @id @default(autoincrement()) @db.UnsignedInt
-  titel_typ_bezeichnung String  @unique(map: "titel_typ_bezeichnung_UNIQUE") @db.VarChar(45)
-  titel                 titel[]
 }
