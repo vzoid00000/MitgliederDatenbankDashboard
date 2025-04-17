@@ -7,11 +7,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum TitelPosition {
-  VOR
-  NACH
-}
-
 model email {
   email_id         Int                @id @default(autoincrement()) @db.UnsignedInt
   email_adresse    String?            @unique(map: "unique_email_adresse") @db.VarChar(45)
@@ -38,6 +33,7 @@ model person {
   person_id                   Int       @id @default(autoincrement()) @db.UnsignedInt
   vorname                     String    @db.VarChar(45)
   nachname                    String    @db.VarChar(45)
+  voller_name                 String?   @db.VarChar(255)
   geburtsdatum                DateTime? @db.Date
   mitgliedsnummer             Int?      @unique(map: "unique_mitgliedsnummer") @db.UnsignedInt
   schuetzenpassnummer         Int?      @unique(map: "unique_schuetzenpassnummer") @db.UnsignedInt
@@ -54,7 +50,6 @@ model person {
   geschlecht               geschlecht                 @relation(fields: [geschlecht_id], references: [geschlecht_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_person_geschlecht")
   person_hat_email         person_hat_email[]
   person_hat_telefonnummer person_hat_telefonnummer[]
-  person_hat_titel         person_hat_titel[]
   person_hat_rolle         person_hat_rolle[]
   person_hat_status        person_hat_status[]
 
@@ -81,18 +76,6 @@ model person_hat_telefonnummer {
   @@id([person_id, telefonnummer_id])
   @@index([person_id], map: "idx_person_telefonnummer")
   @@index([telefonnummer_id], map: "idx_telefonnummer")
-}
-
-model person_hat_titel {
-  person_id   Int    @db.UnsignedInt
-  titel_id    Int    @db.UnsignedInt
-  reihenfolge Int    @db.UnsignedInt
-  person      person @relation(fields: [person_id], references: [person_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_person_hat_titel_person")
-  titel       titel  @relation(fields: [titel_id], references: [titel_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_person_hat_titel_titel")
-
-  @@id([person_id, titel_id])
-  @@index([person_id], map: "idx_person_titel")
-  @@index([titel_id], map: "idx_titel")
 }
 
 model person_hat_rolle {
@@ -144,11 +127,4 @@ model telefonnummer_typ {
   telefonnummer_typ_id Int             @id @default(autoincrement()) @db.UnsignedInt
   telefonnummer_typ    String          @unique(map: "unique_telefonnummer_typ") @db.VarChar(45)
   telefonnummer        telefonnummer[]
-}
-
-model titel {
-  titel_id         Int                @id @default(autoincrement()) @db.UnsignedInt
-  titel            String             @unique(map: "titel_UNIQUE") @db.VarChar(45)
-  position         TitelPosition      @default(VOR)
-  person_hat_titel person_hat_titel[]
 }

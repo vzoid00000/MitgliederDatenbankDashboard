@@ -22,7 +22,6 @@ const getIconForTable = (tableName: string) => {
         case 'person': return <Users className={iconClass} />;
         case 'geschlecht': return <VenusAndMars className={iconClass} />;
         case 'status': return <Tags className={iconClass} />;
-        case 'titel': return <Award className={iconClass} />;
         case 'telefonnummertyp': return <Phone className={iconClass} />;
         case 'rolle': return <UserCircle className={iconClass} />;
         default: return <Users className={iconClass} />;
@@ -31,7 +30,7 @@ const getIconForTable = (tableName: string) => {
 
 export const meta: MetaFunction = () => [
     { title: "Mitgliederdatenbank Dashboard" },
-    { name: "description", content: "Mitgliederdatenbank" },
+    { name: "description", content: "Mitgliederdatenbank Übersicht" },
 ];
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -39,10 +38,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         { name: "Person", count: await prisma.person.count() },
         { name: "Geschlecht", count: await prisma.geschlecht.count() },
         { name: "Status", count: await prisma.status.count() },
-        { name: "Titel", count: await prisma.titel.count() },
         { name: "Telefonnummertyp", count: await prisma.telefonnummer_typ.count() },
         { name: "Rolle", count: await prisma.rolle.count() },
-        // Titeltyp entfernt
     ];
     return json({ tables });
 };
@@ -86,7 +83,7 @@ export default function Index() {
                                             <div>
                                                 <Title level={5} className="mb-0">{table.name}</Title>
                                                 <Typography.Text type="secondary">
-                                                    {table.name}-Table Einträge verwalten
+                                                    {table.name}-Tabelle verwalten
                                                 </Typography.Text>
                                             </div>
                                         </div>

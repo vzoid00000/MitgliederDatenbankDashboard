@@ -1,4 +1,3 @@
-// root.tsx
 import {
   Links,
   Meta,
@@ -16,19 +15,16 @@ import {
   LayoutDashboard,
   Users,
   Tags,
-  Award,
   Phone,
   UserCircle,
   VenusAndMars,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
-// Tabelle "Titeltyp" entfernt
 const tableNames = [
   "Person",
   "Geschlecht",
   "Status",
-  "Titel",
   "Telefonnummertyp",
   "Rolle",
 ];
@@ -44,8 +40,6 @@ const getIconForTable = (tableName: string) => {
       return <VenusAndMars className="w-5 h-5" />;
     case "status":
       return <Tags className="w-5 h-5" />;
-    case "titel":
-      return <Award className="w-5 h-5" />;
     case "telefonnummertyp":
       return <Phone className="w-5 h-5" />;
     case "rolle":
