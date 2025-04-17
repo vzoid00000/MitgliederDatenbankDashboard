@@ -1,30 +1,54 @@
 import { useState, useMemo } from "react";
 import {
-    Layout, Card, Typography, Space, Button, Input, Table, Modal, Form,
-    DatePicker, Select, Switch, Tabs, Tag, Row, Col, Avatar, Tooltip, message, Checkbox
+    Layout,
+    Card,
+    Typography,
+    Space,
+    Button,
+    Input,
+    Table,
+    Modal,
+    Form,
+    DatePicker,
+    Select,
+    Tag,
+    Avatar,
+    Tooltip,
+    message,
+    Checkbox,
+    Steps,
+    Row,
+    Col
 } from "antd";
 import {
-    PlusOutlined, EditOutlined, DeleteOutlined, InfoCircleOutlined,
-    MailOutlined, PhoneOutlined, HomeOutlined, IdcardOutlined, UserOutlined,
-    FileTextOutlined
+    PlusOutlined,
+    EditOutlined,
+    DeleteOutlined,
+    InfoCircleOutlined,
+    MailOutlined,
+    PhoneOutlined,
+    HomeOutlined,
+    IdcardOutlined
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 
 const { Content } = Layout;
 const { Title, Text } = Typography;
 const { Option } = Select;
+const { Step } = Steps;
 
-// MOCK: ersetze später durch echten DB-Call
+// MOCK: später durch echten DB‑Call ersetzen
 const allStatuses = [
     { status_id: 1, status_bezeichnung: "Aktiv" },
-    { status_id: 3, status_bezeichnung: "Ruhend" },
+    { status_id: 3, status_bezeichnung: "Ruhend" }
 ];
 const allRollen = [
     { rolle_id: 2, rolle_bezeichnung: "Mitglied" },
-    { rolle_id: 3, rolle_bezeichnung: "Trainerin" },
+    { rolle_id: 3, rolle_bezeichnung: "Trainerin" }
 ];
 
 export default function PersonPage() {
+    // Filter‑State
     const [searchName, setSearchName] = useState("");
     const [searchMitgliedsnummer, setSearchMitgliedsnummer] = useState("");
     const [searchSchuetzenpassnummer, setSearchSchuetzenpassnummer] = useState("");
@@ -33,12 +57,16 @@ export default function PersonPage() {
     const [landesverbandChecked, setLandesverbandChecked] = useState(false);
     const [schluesselChecked, setSchluesselChecked] = useState(false);
 
-    const [selectedRowKeys, setSelectedRowKeys] = useState([]);
+    // Tabellen‑Auswahl
+    const [selectedRowKeys, setSelectedRowKeys] = useState<number[]>([]);
     const [multiDeleteMode, setMultiDeleteMode] = useState(false);
-    const [isModalVisible, setIsModalVisible] = useState(false);
-    const [form] = Form.useForm();
-    const [activeStep, setActiveStep] = useState("1");
 
+    // Modal & Form‑State
+    const [isModalVisible, setIsModalVisible] = useState(false);
+    const [currentStep, setCurrentStep] = useState(0);
+    const [form] = Form.useForm();
+
+    // mock persons
     const persons = [
         {
             person_id: 1,
@@ -105,8 +133,9 @@ export default function PersonPage() {
         }
     ];
 
+    // Filter‑Logik
     const filteredPersons = useMemo(() => {
-        return persons.filter((p) => {
+        return persons.filter(p => {
             const name = `${p.vorname} ${p.nachname}`.toLowerCase();
             const nameMatch = name.includes(searchName.toLowerCase());
             const mitgliedsnummerMatch = searchMitgliedsnummer
@@ -115,34 +144,20 @@ export default function PersonPage() {
             const schuetzenpassnummerMatch = searchSchuetzenpassnummer
                 ? p.schuetzenpassnummer?.toString().includes(searchSchuetzenpassnummer)
                 : true;
-            const statusMatch =
-                selectedStatus.length > 0
-                    ? p.person_hat_status?.some((s) =>
-                        selectedStatus.includes(s.status.status_id)
-                    )
-                    : true;
-            const rolleMatch =
-                selectedRolle.length > 0
-                    ? p.person_hat_rolle?.some((r) =>
-                        selectedRolle.includes(r.rolle.rolle_id)
-                    )
-                    : true;
+            const statusMatch = selectedStatus.length > 0
+                ? p.person_hat_status.some(s => selectedStatus.includes(s.status.status_id))
+                : true;
+            const rolleMatch = selectedRolle.length > 0
+                ? p.person_hat_rolle.some(r => selectedRolle.includes(r.rolle.rolle_id))
+                : true;
             const landesverbandMatch = landesverbandChecked
                 ? p.ist_landesverband_gemeldet === 1
                 : true;
             const schluesselMatch = schluesselChecked
                 ? p.hat_schluessel_suessenbrunn === 1
                 : true;
-
-            return (
-                nameMatch &&
-                mitgliedsnummerMatch &&
-                schuetzenpassnummerMatch &&
-                statusMatch &&
-                rolleMatch &&
-                landesverbandMatch &&
-                schluesselMatch
-            );
+            return nameMatch && mitgliedsnummerMatch && schuetzenpassnummerMatch
+                && statusMatch && rolleMatch && landesverbandMatch && schluesselMatch;
         });
     }, [
         persons,
@@ -152,9 +167,10 @@ export default function PersonPage() {
         selectedStatus,
         selectedRolle,
         landesverbandChecked,
-        schluesselChecked,
+        schluesselChecked
     ]);
 
+    // table columns
     const columns = [
         {
             title: "Person",
@@ -171,31 +187,39 @@ export default function PersonPage() {
                                     ? "#eb2f96"
                                     : record.geschlecht?.geschlecht === "M"
                                         ? "#1890ff"
-                                        : "#d9d9d9",
+                                        : "#d9d9d9"
                         }}
                     >
-                        {record.vorname[0]}{record.nachname[0]}
+                        {record.vorname[0]}
+                        {record.nachname[0]}
                     </Avatar>
                     <Space direction="vertical" size={0}>
                         <Text strong>
-                            {(record.titel?.map((t) => t.titel.titel).join(" ") || "") + " " + record.vorname + " " + record.nachname}
+                            {(record.titel?.map((t) => t.titel.titel).join(" ") || "") +
+                                " " +
+                                record.vorname +
+                                " " +
+                                record.nachname}
                         </Text>
-                        <Text type="secondary">{dayjs(record.geburtsdatum).format("DD.MM.YYYY")}</Text>
+                        <Text type="secondary">
+                            {dayjs(record.geburtsdatum).format("DD.MM.YYYY")}
+                        </Text>
                         <Text type="secondary">
                             <Tooltip title="Mitgliedsnummer">
-                                <span style={{ marginRight: 12 }}>
-                                    <IdcardOutlined style={{ marginRight: 4 }} />
-                                    {record.mitgliedsnummer}
-                                </span>
+                <span style={{ marginRight: 12 }}>
+                  <IdcardOutlined style={{ marginRight: 4 }} />
+                    {record.mitgliedsnummer}
+                </span>
                             </Tooltip>
                             <Tooltip title="Schützenpassnummer">
-                                <span>
-                                    <IdcardOutlined style={{ marginRight: 4 }} />
-                                    {record.schuetzenpassnummer}
-                                </span>
+                <span>
+                  <IdcardOutlined style={{ marginRight: 4 }} />
+                    {record.schuetzenpassnummer}
+                </span>
                             </Tooltip>
                         </Text>
-                        {(record.ist_landesverband_gemeldet === 1 || record.hat_schluessel_suessenbrunn === 1) && (
+                        {(record.ist_landesverband_gemeldet === 1 ||
+                            record.hat_schluessel_suessenbrunn === 1) && (
                             <Text type="secondary">
                                 {record.ist_landesverband_gemeldet === 1 && (
                                     <Tooltip title="Ist beim Landesverband gemeldet">
@@ -211,7 +235,7 @@ export default function PersonPage() {
                         )}
                     </Space>
                 </Space>
-            ),
+            )
         },
         {
             title: "Status",
@@ -219,12 +243,15 @@ export default function PersonPage() {
             render: (record) => (
                 <Space wrap>
                     {record.person_hat_status?.map((s) => (
-                        <Tag key={s.status.status_id} color={s.status.status_bezeichnung === "Aktiv" ? "green" : "orange"}>
+                        <Tag
+                            key={s.status.status_id}
+                            color={s.status.status_bezeichnung === "Aktiv" ? "green" : "orange"}
+                        >
                             {s.status.status_bezeichnung}
                         </Tag>
                     ))}
                 </Space>
-            ),
+            )
         },
         {
             title: "Rollen",
@@ -237,7 +264,7 @@ export default function PersonPage() {
                         </Tag>
                     ))}
                 </Space>
-            ),
+            )
         },
         {
             title: "Aktionen",
@@ -245,12 +272,42 @@ export default function PersonPage() {
             fixed: "right",
             render: () => (
                 <Space>
-                    <Button type="text" icon={<EditOutlined />}>Bearbeiten</Button>
-                    <Button type="text" danger icon={<DeleteOutlined />}>Löschen</Button>
+                    <Button type="text" icon={<EditOutlined />}>
+                        Bearbeiten
+                    </Button>
+                    <Button type="text" danger icon={<DeleteOutlined />}>
+                        Löschen
+                    </Button>
                 </Space>
-            ),
-        },
+            )
+        }
     ];
+
+    // Submit‑Handler
+    const handleFormSubmit = async (values: any) => {
+        try {
+            console.log("Neue Person:", values);
+            message.success("Person erfolgreich hinzugefügt");
+            setIsModalVisible(false);
+            setCurrentStep(0);
+            form.resetFields();
+            // TODO: hier Prisma‑Call oder API‑Request
+        } catch {
+            message.error("Fehler beim Hinzufügen");
+        }
+    };
+
+    // Schritt‑vorwärts nur wenn die nötigen Felder erfüllt sind
+    const next = () => {
+        if (currentStep === 0) {
+            // Basisdaten validieren
+            form.validateFields(["vorname", "nachname", "geschlecht_id"])
+                .then(() => setCurrentStep(1))
+                .catch(() => {});
+        } else {
+            setCurrentStep(s => s + 1);
+        }
+    };
 
     return (
         <Content className="p-6">
@@ -258,7 +315,7 @@ export default function PersonPage() {
                 <Space align="center">
                     <Title level={3}>Personenverwaltung</Title>
                     <Tooltip title="Hier können Sie Mitglieder verwalten.">
-                        <InfoCircleOutlined style={{ fontSize: "16px", color: "#1890ff" }} />
+                        <InfoCircleOutlined style={{ fontSize: 16, color: "#1890ff" }} />
                     </Tooltip>
                 </Space>
             </Card>
@@ -270,16 +327,11 @@ export default function PersonPage() {
                         <Button
                             type="primary"
                             icon={<PlusOutlined />}
-                            onClick={() => {
-                                setIsModalVisible(true);
-                                form.resetFields();
-                                setActiveStep("1");
-                            }}
+                            onClick={() => setIsModalVisible(true)}
                             disabled={multiDeleteMode}
                         >
                             Neue Person
                         </Button>
-
                         <Button
                             type={multiDeleteMode ? "default" : "dashed"}
                             danger={multiDeleteMode}
@@ -290,13 +342,12 @@ export default function PersonPage() {
                         >
                             {multiDeleteMode ? "Mehrfachauswahl beenden" : "Mehrere löschen"}
                         </Button>
-
                         {multiDeleteMode && selectedRowKeys.length > 0 && (
                             <Button
                                 danger
                                 type="primary"
                                 onClick={() => {
-                                    message.success(`${selectedRowKeys.length} Personen gelöscht (Demo).`);
+                                    message.success(`${selectedRowKeys.length} gelöscht`);
                                     setSelectedRowKeys([]);
                                     setMultiDeleteMode(false);
                                 }}
@@ -307,11 +358,27 @@ export default function PersonPage() {
                     </Space>
                 }
             >
+                {/* Filterleiste */}
                 <div style={{ marginBottom: 16 }}>
                     <Space wrap>
-                        <Input placeholder="Name" value={searchName} onChange={(e) => setSearchName(e.target.value)} allowClear />
-                        <Input placeholder="Mitgliedsnummer" value={searchMitgliedsnummer} onChange={(e) => setSearchMitgliedsnummer(e.target.value)} allowClear />
-                        <Input placeholder="Schützenpassnummer" value={searchSchuetzenpassnummer} onChange={(e) => setSearchSchuetzenpassnummer(e.target.value)} allowClear />
+                        <Input
+                            placeholder="Name"
+                            value={searchName}
+                            onChange={e => setSearchName(e.target.value)}
+                            allowClear
+                        />
+                        <Input
+                            placeholder="Mitgliedsnummer"
+                            value={searchMitgliedsnummer}
+                            onChange={e => setSearchMitgliedsnummer(e.target.value)}
+                            allowClear
+                        />
+                        <Input
+                            placeholder="Schützenpassnummer"
+                            value={searchSchuetzenpassnummer}
+                            onChange={e => setSearchSchuetzenpassnummer(e.target.value)}
+                            allowClear
+                        />
                         <Select
                             mode="multiple"
                             placeholder="Status"
@@ -320,8 +387,10 @@ export default function PersonPage() {
                             onChange={setSelectedStatus}
                             style={{ width: 200 }}
                         >
-                            {allStatuses.map((s) => (
-                                <Option key={s.status_id} value={s.status_id}>{s.status_bezeichnung}</Option>
+                            {allStatuses.map(s => (
+                                <Option key={s.status_id} value={s.status_id}>
+                                    {s.status_bezeichnung}
+                                </Option>
                             ))}
                         </Select>
                         <Select
@@ -332,14 +401,22 @@ export default function PersonPage() {
                             onChange={setSelectedRolle}
                             style={{ width: 200 }}
                         >
-                            {allRollen.map((r) => (
-                                <Option key={r.rolle_id} value={r.rolle_id}>{r.rolle_bezeichnung}</Option>
+                            {allRollen.map(r => (
+                                <Option key={r.rolle_id} value={r.rolle_id}>
+                                    {r.rolle_bezeichnung}
+                                </Option>
                             ))}
                         </Select>
-                        <Checkbox checked={landesverbandChecked} onChange={(e) => setLandesverbandChecked(e.target.checked)}>
+                        <Checkbox
+                            checked={landesverbandChecked}
+                            onChange={e => setLandesverbandChecked(e.target.checked)}
+                        >
                             Landesverband
                         </Checkbox>
-                        <Checkbox checked={schluesselChecked} onChange={(e) => setSchluesselChecked(e.target.checked)}>
+                        <Checkbox
+                            checked={schluesselChecked}
+                            onChange={e => setSchluesselChecked(e.target.checked)}
+                        >
                             Schlüssel
                         </Checkbox>
                     </Space>
@@ -350,12 +427,181 @@ export default function PersonPage() {
                     columns={columns}
                     rowKey="person_id"
                     pagination={{ pageSize: 5 }}
-                    rowSelection={multiDeleteMode ? {
-                        selectedRowKeys,
-                        onChange: setSelectedRowKeys,
-                    } : undefined}
+                    rowSelection={
+                        multiDeleteMode
+                            ? {
+                                selectedRowKeys,
+                                onChange: setSelectedRowKeys
+                            }
+                            : undefined
+                    }
                 />
             </Card>
+
+            <Modal
+                title="Neue Person anlegen"
+                visible={isModalVisible}
+                onCancel={() => {
+                    setIsModalVisible(false);
+                    setCurrentStep(0);
+                    form.resetFields();
+                }}
+                footer={null}
+                width={800}
+            >
+                <Steps current={currentStep} style={{ marginBottom: 24 }}>
+                    <Step title="Basisdaten" />
+                    <Step title="Kontakt" />
+                    <Step title="Mitgliedschaft" />
+                    <Step title="Zusatz" />
+                </Steps>
+
+                <Form
+                    form={form}
+                    layout="vertical"
+                    onFinish={handleFormSubmit}
+                    initialValues={{
+                        ist_landesverband_gemeldet: false,
+                        hat_schluessel_suessenbrunn: false
+                    }}
+                >
+                    {currentStep === 0 && (
+                        <>
+                            <Row gutter={16}>
+                                <Col span={12}>
+                                    <Form.Item
+                                        name="vorname"
+                                        label="Vorname"
+                                        rules={[{ required: true, message: "Bitte Vorname eingeben" }]}
+                                    >
+                                        <Input />
+                                    </Form.Item>
+                                </Col>
+                                <Col span={12}>
+                                    <Form.Item
+                                        name="nachname"
+                                        label="Nachname"
+                                        rules={[{ required: true, message: "Bitte Nachname eingeben" }]}
+                                    >
+                                        <Input />
+                                    </Form.Item>
+                                </Col>
+                            </Row>
+                            <Row gutter={16}>
+                                <Col span={12}>
+                                    <Form.Item name="geburtsdatum" label="Geburtsdatum">
+                                        <DatePicker format="DD.MM.YYYY" style={{ width: "100%" }} />
+                                    </Form.Item>
+                                </Col>
+                                <Col span={12}>
+                                    <Form.Item
+                                        name="geschlecht_id"
+                                        label="Geschlecht"
+                                        rules={[{ required: true, message: "Bitte Geschlecht wählen" }]}
+                                    >
+                                        <Select placeholder="Geschlecht wählen">
+                                            <Option value={1}>M</Option>
+                                            <Option value={2}>W</Option>
+                                            <Option value={3}>D</Option>
+                                        </Select>
+                                    </Form.Item>
+                                </Col>
+                            </Row>
+                        </>
+                    )}
+
+                    {currentStep === 1 && (
+                        <>
+                            <Form.Item name="strasse" label="Straße">
+                                <Input />
+                            </Form.Item>
+                            <Row gutter={16}>
+                                <Col span={8}>
+                                    <Form.Item name="plz" label="PLZ">
+                                        <Input />
+                                    </Form.Item>
+                                </Col>
+                                <Col span={16}>
+                                    <Form.Item name="ort" label="Ort">
+                                        <Input />
+                                    </Form.Item>
+                                </Col>
+                            </Row>
+                            <Form.Item name="email" label="E-Mail" rules={[{ type: "email", message: "Ungültige E-Mail" }]}>
+                                <Input />
+                            </Form.Item>
+                            <Form.Item name="telefonnummer" label="Telefonnummer">
+                                <Input />
+                            </Form.Item>
+                        </>
+                    )}
+
+                    {currentStep === 2 && (
+                        <>
+                            <Row gutter={16}>
+                                <Col span={12}>
+                                    <Form.Item name="mitgliedsnummer" label="Mitgliedsnummer">
+                                        <Input type="number" />
+                                    </Form.Item>
+                                </Col>
+                                <Col span={12}>
+                                    <Form.Item name="schuetzenpassnummer" label="Schützenpassnummer">
+                                        <Input type="number" />
+                                    </Form.Item>
+                                </Col>
+                            </Row>
+                            <Form.Item name="ist_landesverband_gemeldet" valuePropName="checked" label="Landesverband gemeldet">
+                                <Checkbox />
+                            </Form.Item>
+                            <Form.Item name="hat_schluessel_suessenbrunn" valuePropName="checked" label="Schlüssel für Süßenbrunn">
+                                <Checkbox />
+                            </Form.Item>
+                        </>
+                    )}
+
+                    {currentStep === 3 && (
+                        <>
+                            <Form.Item name="username" label="Benutzername">
+                                <Input />
+                            </Form.Item>
+                            <Form.Item name="notiz" label="Notiz">
+                                <Input.TextArea rows={4} />
+                            </Form.Item>
+                        </>
+                    )}
+
+                    <Form.Item>
+                        <Space>
+                            {currentStep === 0 && (
+                                <Button
+                                    onClick={() => {
+                                        setIsModalVisible(false);
+                                        setCurrentStep(0);
+                                        form.resetFields();
+                                    }}
+                                >
+                                    Abbrechen
+                                </Button>
+                            )}
+                            {currentStep > 0 && (
+                                <Button onClick={() => setCurrentStep(s => s - 1)}>
+                                    Zurück
+                                </Button>
+                            )}
+                            {currentStep < 3 && (
+                                <Button type="primary" onClick={next}>
+                                    Weiter
+                                </Button>
+                            )}
+                            {currentStep === 3 && (
+                                <Button type="primary" htmlType="submit">
+                                    Speichern
+                                </Button>
+                            )}
+                        </Space>
+                    </Form.Item>
+                </Form>
+            </Modal>
         </Content>
     );
 }
