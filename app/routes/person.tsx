@@ -429,9 +429,21 @@ export default function PersonPage() {
             console.log(`📦 FormData: ${key} = ${value}`);
         }
 
-        submit(formData, { method: "post" });
-    };
+        try {
+            await submit(formData, { method: "post" });
 
+            // Nach erfolgreichem Speichern Modal schließen
+            setIsModalVisible(false);
+            setCurrentStep(0);  // Zurück auf den ersten Schritt
+            form.resetFields();  // Felder zurücksetzen
+            setVornameInput("");
+            setNachnameInput("");
+            setTitelInput("");
+            setNameOrderList(["NAME"]);
+        } catch (error) {
+            console.warn("🚫 Fehler beim Speichern der Person", error);
+        }
+    };
 
 
 
@@ -443,15 +455,26 @@ export default function PersonPage() {
             form.validateFields(["vorname", "nachname", "geschlecht_id"])
                 .then(() => setCurrentStep(1))
                 .catch(() => {
+                    // Validation failed, stay on the same step
                 });
         } else if (currentStep === 1) {
-            form.validateFields().then(() => setCurrentStep(s => s + 1)).catch(() => {
-            });
+            form.validateFields()
+                .then(() => setCurrentStep(s => s + 1))
+                .catch(() => {
+                    // Validation failed, stay on the same step
+                });
+        } else if (currentStep === 2) {
+            // In step 2, we want to validate that the status is selected
+            form.validateFields(["status"])
+                .then(() => setCurrentStep(s => s + 1))
+                .catch(() => {
+                    // Validation failed, stay on the same step
+                });
         } else {
             setCurrentStep(s => s + 1);
         }
-
     };
+
 
     return (
         <Content className="p-6">
